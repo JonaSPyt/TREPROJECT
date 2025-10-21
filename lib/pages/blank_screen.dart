@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/barcode_manager.dart';
+import '../widgets/barcode_list_widget.dart';
 
 class BlankScreen extends StatefulWidget {
   final BarcodeManager barcodeManager;
@@ -71,26 +72,10 @@ class _BlankScreenState extends State<BlankScreen> {
                 style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
             )
-          : ListView.builder(
-              itemCount: barcodes.length,
-              itemBuilder: (context, index) {
-                final barcode = barcodes[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  child: ListTile(
-                    leading: CircleAvatar(child: Text('${index + 1}')),
-                    title: Text(barcode),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        widget.barcodeManager.removeBarcode(barcode);
-                      },
-                    ),
-                  ),
-                );
+          : BarcodeListWidget(
+              barcodes: barcodes,
+              onDelete: (barcode) {
+                widget.barcodeManager.removeBarcode(barcode);
               },
             ),
     );
