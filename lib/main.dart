@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'pages/scanner_screen.dart';
 import 'pages/blank_screen.dart';
 import 'pages/third_screen.dart';
+import 'utils/barcode_manager.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,13 +18,15 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const HomeScreen(),
+      home: HomeScreen(barcodeManager: BarcodeManager()),
     );
   }
 }
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  final BarcodeManager barcodeManager;
+
+  const HomeScreen({super.key, required this.barcodeManager});
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +44,8 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ScannerScreen(),
+                    builder: (context) =>
+                        ScannerScreen(barcodeManager: barcodeManager),
                   ),
                 );
               },
@@ -58,7 +62,10 @@ class HomeScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const BlankScreen()),
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        BlankScreen(barcodeManager: barcodeManager),
+                  ),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -93,9 +100,9 @@ class HomeScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Botão + pressionado')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Botão + pressionado')));
         },
         child: const Icon(Icons.add),
       ),

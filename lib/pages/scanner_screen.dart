@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../utils/barcode_manager.dart';
 
 class ScannerScreen extends StatefulWidget {
-  const ScannerScreen({super.key});
+  final BarcodeManager barcodeManager;
+
+  const ScannerScreen({super.key, required this.barcodeManager});
 
   @override
   State<ScannerScreen> createState() => _ScannerScreenState();
@@ -48,6 +51,25 @@ class _ScannerScreenState extends State<ScannerScreen> {
                         _barcode = code.isNotEmpty ? code : 'Valor vazio';
                         _isScanning = false;
                       });
+
+                      // Adicionar à lista
+                      if (code.isNotEmpty) {
+                        bool wasAdded = widget.barcodeManager.addBarcode(code);
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              wasAdded
+                                  ? 'Código inserido na lista com sucesso!'
+                                  : 'Código já adicionado anteriormente',
+                            ),
+                            backgroundColor: wasAdded
+                                ? Colors.green
+                                : Colors.orange,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
                     }
                   },
                 ),
