@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/barcode_manager.dart';
+import '../utils/barcode_exporter.dart';
 import '../widgets/barcode_list_widget.dart';
 
 class BlankScreen extends StatefulWidget {
@@ -28,6 +29,41 @@ class _BlankScreenState extends State<BlankScreen> {
     setState(() {});
   }
 
+  Future<void> _exportBarcodes() async {
+    final barcodes = widget.barcodeManager.barcodes;
+
+    if (barcodes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nenhum código para exportar'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await BarcodeExporter.exportBarcodes(barcodes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Códigos exportados com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao exportar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final barcodes = widget.barcodeManager.barcodes;
@@ -37,6 +73,12 @@ class _BlankScreenState extends State<BlankScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Lista de Códigos'),
         actions: [
+          if (barcodes.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.share),
+              tooltip: 'Exportar lista',
+              onPressed: _exportBarcodes,
+            ),
           if (barcodes.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep),

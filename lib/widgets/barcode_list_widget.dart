@@ -17,10 +17,7 @@ class BarcodeListWidget extends StatelessWidget {
       itemBuilder: (context, index) {
         final barcode = barcodes[index];
         return Card(
-          margin: const EdgeInsets.symmetric(
-            horizontal: 8,
-            vertical: 4,
-          ),
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: ListTile(
             leading: CircleAvatar(child: Text('${index + 1}')),
             title: Text(barcode),
