@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 enum BarcodeStatus {
   none('Sem status', Colors.grey),
-  found('Bens encontrados e ok', Colors.green),
+  found('Encontrado sem nenhuma pendência', Colors.green),
   foundNotRelated('Bens encontrados e não relacionados', Color(0xFFB19CD9)),
-  notRegistered('Bens não tombados', Colors.lightBlue),
+  notRegistered('Bens permanentes sem identificação', Colors.lightBlue),
   damaged('Bens danificados', Colors.orange),
   notFound('Bens não encontrados', Colors.red);
 
@@ -18,6 +18,20 @@ class BarcodeItem {
   BarcodeStatus status;
 
   BarcodeItem({required this.code, this.status = BarcodeStatus.none});
+
+  Map<String, dynamic> toMap() => {
+        'code': code,
+        'status': status.index,
+      };
+
+  factory BarcodeItem.fromMap(Map<String, dynamic> map) {
+    final idx = map['status'] is int ? map['status'] as int : 0;
+    final safeIdx = idx >= 0 && idx < BarcodeStatus.values.length ? idx : 0;
+    return BarcodeItem(
+      code: map['code']?.toString() ?? '',
+      status: BarcodeStatus.values[safeIdx],
+    );
+  }
 }
 
 class BarcodeManager extends ChangeNotifier {

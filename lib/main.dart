@@ -3,6 +3,8 @@ import 'pages/scanner_screen.dart';
 import 'pages/blank_screen.dart';
 import 'pages/third_screen.dart';
 import 'utils/barcode_manager.dart';
+import 'package:file_picker/file_picker.dart';
+import 'services/csv_import_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -81,7 +83,9 @@ class HomeScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ThirdScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const ThirdScreen(items: []),
+                  ),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -99,10 +103,33 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          ScaffoldMessenger.of(
+        onPressed: () async {
+          final result = await FilePicker.platform.pickFiles(
+            type: FileType.custom,
+            allowedExtensions: ['csv'],
+            withData: true,
+          );
+          if (result == null || result.files.isEmpty) return;
+          final file = result.files.single;
+          final bytes = file.bytes;
+          if (bytes == null) return;
+
+          final items = CsvImportService.parseCsv(bytes);
+          if (!context.mounted) return;
+
+          if (items.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('CSV não contém patrimônios válidos.')),
+            );
+            return;
+          }
+
+          Navigator.push(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Botão + pressionado')));
+            MaterialPageRoute(
+              builder: (_) => ThirdScreen(items: items),
+            ),
+          );
         },
         child: const Icon(Icons.add),
       ),
