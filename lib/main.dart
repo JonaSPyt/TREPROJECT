@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'pages/scanner_screen.dart';
 import 'pages/blank_screen.dart';
+import 'pages/third_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -67,6 +68,25 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               child: const Text('Outra Tela', style: TextStyle(fontSize: 18)),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ThirdScreen()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 40,
+                  vertical: 20,
+                ),
+              ),
+              child: const Text(
+                'Terceira Tela',
+                style: TextStyle(fontSize: 18),
+              ),
             ),
           ],
         ),
