@@ -119,6 +119,9 @@ class _BlankScreenState extends State<BlankScreen> {
               onDelete: (barcode) {
                 widget.barcodeManager.removeBarcode(barcode);
               },
+              onStatusChange: (barcode, status) {
+                widget.barcodeManager.updateBarcodeStatus(barcode, status);
+              },
             ),
     );
   }

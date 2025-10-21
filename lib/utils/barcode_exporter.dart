@@ -1,9 +1,10 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'barcode_manager.dart';
 
 class BarcodeExporter {
-  static Future<void> exportBarcodes(List<String> barcodes) async {
+  static Future<void> exportBarcodes(List<BarcodeItem> barcodes) async {
     if (barcodes.isEmpty) {
       throw Exception('Nenhum código para exportar');
     }
@@ -18,7 +19,10 @@ class BarcodeExporter {
       content.writeln();
 
       for (int i = 0; i < barcodes.length; i++) {
-        content.writeln('${i + 1}. ${barcodes[i]}');
+        final item = barcodes[i];
+        content.writeln('${i + 1}. ${item.code}');
+        content.writeln('   Status: ${item.status.label}');
+        content.writeln();
       }
 
       // Obter diretório temporário
