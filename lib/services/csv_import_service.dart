@@ -28,19 +28,19 @@ class CsvImportService {
       patrimonioIndex = 6;
     }
 
-    bool _parseBool(dynamic v) {
+    bool parseBool(dynamic v) {
       if (v == null) return false;
       final s = v.toString().trim().toLowerCase();
       return s == 'true' || s == '1' || s == 'x' || s == 'sim' || s == 'yes';
     }
 
-    BarcodeStatus _statusFromFlags(List row) {
+    BarcodeStatus statusFromFlags(List row) {
       // Consider columns A..E as indices 0..4 if present and boolean-like.
-      final a = row.length > 0 ? _parseBool(row[0]) : false; // Encontrado sem nenhuma pendência
-      final b = row.length > 1 ? _parseBool(row[1]) : false; // Bens encontrados e não relacionados
-      final c = row.length > 2 ? _parseBool(row[2]) : false; // Bens permanentes sem identificação
-      final d = row.length > 3 ? _parseBool(row[3]) : false; // Bens danificados
-      final e = row.length > 4 ? _parseBool(row[4]) : false; // Bens não encontrados
+      final a = row.isNotEmpty ? parseBool(row[0]) : false; // Encontrado sem nenhuma pendência
+      final b = row.length > 1 ? parseBool(row[1]) : false; // Bens encontrados e não relacionados
+      final c = row.length > 2 ? parseBool(row[2]) : false; // Bens permanentes sem identificação
+      final d = row.length > 3 ? parseBool(row[3]) : false; // Bens danificados
+      final e = row.length > 4 ? parseBool(row[4]) : false; // Bens não encontrados
 
       if (a) return BarcodeStatus.found;
       if (b) return BarcodeStatus.foundNotRelated;
@@ -58,7 +58,7 @@ class CsvImportService {
       if (value == null) continue;
       final code = value.toString().trim();
       if (code.isEmpty) continue;
-      final status = _statusFromFlags(row);
+      final status = statusFromFlags(row);
       items.add(BarcodeItem(code: code, status: status));
     }
 

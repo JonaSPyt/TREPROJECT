@@ -45,28 +45,53 @@ class _ScannerScreenState extends State<ScannerScreen> {
                     if (!_isScanning) return;
                     final List<Barcode> barcodes = capture.barcodes;
                     if (barcodes.isNotEmpty) {
-                      final String code = barcodes.first.rawValue ?? '';
+                      final String raw = barcodes.first.rawValue ?? '';
+                      // Prepare truncated version (strip first 3 chars and leading zeros)
+                      String truncated = raw.length > 3 ? raw.substring(3) : '';
+                      truncated = truncated.replaceFirst(RegExp(r'^0+'), '');
+
                       _controller.stop();
+                      // Always display the raw value to the user
                       setState(() {
-                        _barcode = code.isNotEmpty ? code : 'Valor vazio';
+                        _barcode = raw.isNotEmpty ? raw : 'Valor vazio';
                         _isScanning = false;
                       });
 
-                      // Adicionar à lista
-                      if (code.isNotEmpty) {
-                        bool wasAdded = widget.barcodeManager.addBarcode(code);
+                      // Decide what to add:
+                      // - If truncated is non-empty and neither truncated nor raw exist, add truncated.
+                      // - Else if raw is non-empty and not present, add raw.
+                      // - Else report duplicate or invalid.
+                      final hasRaw = widget.barcodeManager.containsBarcode(raw);
+                      final hasTrunc = truncated.isNotEmpty && widget.barcodeManager.containsBarcode(truncated);
 
+                      if (truncated.isNotEmpty && !hasTrunc && !hasRaw) {
+                        final wasAdded = widget.barcodeManager.addBarcode(truncated);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(
-                              wasAdded
-                                  ? 'Código inserido na lista com sucesso!'
-                                  : 'Código já adicionado anteriormente',
-                            ),
-                            backgroundColor: wasAdded
-                                ? Colors.green
-                                : Colors.orange,
+                            content: Text(wasAdded
+                                ? 'Código (truncado) inserido na lista: $truncated'
+                                : 'Código já adicionado anteriormente'),
+                            backgroundColor: wasAdded ? Colors.green : Colors.orange,
                             duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      } else if (raw.isNotEmpty && !hasRaw && !hasTrunc) {
+                        final wasAdded = widget.barcodeManager.addBarcode(raw);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(wasAdded
+                                ? 'Código inserido na lista: $raw'
+                                : 'Código já adicionado anteriormente'),
+                            backgroundColor: wasAdded ? Colors.green : Colors.orange,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Código já adicionado anteriormente ou inválido.'),
+                            backgroundColor: Colors.orange,
+                            duration: Duration(seconds: 2),
                           ),
                         );
                       }

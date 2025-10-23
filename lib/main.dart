@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'pages/scanner_screen.dart';
 import 'pages/blank_screen.dart';
-import 'pages/third_screen.dart';
+// Third screen removed; functionality merged into BlankScreen
 import 'utils/barcode_manager.dart';
 import 'package:file_picker/file_picker.dart';
 import 'services/csv_import_service.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final manager = BarcodeManager();
+  await manager.loadFromStorage();
+  runApp(MyApp(barcodeManager: manager));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final BarcodeManager barcodeManager;
+
+  const MyApp({super.key, required this.barcodeManager});
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +25,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: HomeScreen(barcodeManager: BarcodeManager()),
+      home: HomeScreen(barcodeManager: barcodeManager),
     );
   }
 }
@@ -78,27 +83,7 @@ class HomeScreen extends StatelessWidget {
               ),
               child: const Text('Outra Tela', style: TextStyle(fontSize: 18)),
             ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ThirdScreen(items: []),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 40,
-                  vertical: 20,
-                ),
-              ),
-              child: const Text(
-                'Terceira Tela',
-                style: TextStyle(fontSize: 18),
-              ),
-            ),
+            // (Third screen removed)
           ],
         ),
       ),
@@ -113,7 +98,6 @@ class HomeScreen extends StatelessWidget {
           final file = result.files.single;
           final bytes = file.bytes;
           if (bytes == null) return;
-
           final items = CsvImportService.parseCsv(bytes);
           if (!context.mounted) return;
 
@@ -124,10 +108,32 @@ class HomeScreen extends StatelessWidget {
             return;
           }
 
+          // Merge parsed items into shared BarcodeManager, skipping duplicates
+          int added = 0;
+          int skipped = 0;
+          for (final it in items) {
+            final wasAdded = barcodeManager.addBarcodeItem(it);
+            if (wasAdded) {
+              added++;
+            } else {
+              skipped++;
+            }
+          }
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Importado: $added, Ignorados: $skipped'),
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+
+          // Open the combined list screen (BlankScreen) so user sees merged result
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => ThirdScreen(items: items),
+              builder: (context) => BlankScreen(barcodeManager: barcodeManager),
             ),
           );
         },

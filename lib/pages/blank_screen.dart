@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../utils/barcode_manager.dart';
+import 'scanner_screen.dart';
 import '../utils/barcode_exporter.dart';
 import '../widgets/barcode_list_widget.dart';
 
@@ -73,6 +75,20 @@ class _BlankScreenState extends State<BlankScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Lista de Códigos'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: 'Abrir scanner',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ScannerScreen(
+                    barcodeManager: widget.barcodeManager,
+                  ),
+                ),
+              );
+            },
+          ),
           if (barcodes.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.share),

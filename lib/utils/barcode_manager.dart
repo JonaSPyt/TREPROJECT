@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 enum BarcodeStatus {
   none('Sem status', Colors.grey),
@@ -39,6 +43,23 @@ class BarcodeManager extends ChangeNotifier {
 
   List<BarcodeItem> get barcodes => List.unmodifiable(_barcodes);
 
+  /// Returns true if a barcode with [code] already exists in the manager.
+  bool containsBarcode(String code) {
+    return _barcodes.any((item) => item.code == code);
+  }
+
+  /// Adds a [BarcodeItem] preserving its status. Returns true if it was
+  /// added, false if a barcode with the same code already exists.
+  bool addBarcodeItem(BarcodeItem item) {
+    if (item.code.isEmpty) return false;
+    if (containsBarcode(item.code)) return false;
+    _barcodes.add(item);
+    notifyListeners();
+  // persist asynchronously
+  Future.microtask(() => _saveToStorage());
+    return true;
+  }
+
   bool addBarcode(String barcode) {
     if (barcode.isEmpty) {
       return false;
@@ -50,6 +71,8 @@ class BarcodeManager extends ChangeNotifier {
 
     _barcodes.add(BarcodeItem(code: barcode));
     notifyListeners();
+  // persist asynchronously
+  Future.microtask(() => _saveToStorage());
     return true; // Código adicionado com sucesso
   }
 
@@ -57,15 +80,66 @@ class BarcodeManager extends ChangeNotifier {
     final item = _barcodes.firstWhere((item) => item.code == barcode);
     item.status = status;
     notifyListeners();
+  // persist asynchronously
+  Future.microtask(() => _saveToStorage());
   }
 
   void removeBarcode(String barcode) {
     _barcodes.removeWhere((item) => item.code == barcode);
     notifyListeners();
+  // persist asynchronously
+  Future.microtask(() => _saveToStorage());
   }
 
   void clearAll() {
     _barcodes.clear();
     notifyListeners();
+    // persist asynchronously
+    Future.microtask(() => _saveToStorage());
+  }
+
+  // Storage helpers
+  Future<File> _getStorageFile() async {
+  final dir = await getApplicationDocumentsDirectory();
+  return File('${dir.path}/items.json');
+  }
+
+  /// Load saved items into the manager (replaces current in-memory list)
+  Future<void> loadFromStorage() async {
+    try {
+      final file = await _getStorageFile();
+      // Migrate old storage file if present
+      final dir = await getApplicationDocumentsDirectory();
+      final oldFile = File('${dir.path}/third_items.json');
+      if (!await file.exists() && await oldFile.exists()) {
+        try {
+          await oldFile.rename(file.path);
+        } catch (_) {
+          // If rename fails, fall through to try reading old file directly
+        }
+      }
+      if (!await file.exists()) return;
+      final content = await file.readAsString();
+      final decoded = jsonDecode(content);
+      if (decoded is List) {
+        _barcodes.clear();
+        _barcodes.addAll(decoded
+            .whereType<Map<String, dynamic>>()
+            .map((m) => BarcodeItem.fromMap(m)));
+        notifyListeners();
+      }
+    } catch (_) {
+      // ignore read/parse errors
+    }
+  }
+
+  Future<void> _saveToStorage() async {
+    try {
+      final file = await _getStorageFile();
+      final jsonList = _barcodes.map((e) => e.toMap()).toList();
+      await file.writeAsString(jsonEncode(jsonList), flush: true);
+    } catch (_) {
+      // ignore write errors
+    }
   }
 }
