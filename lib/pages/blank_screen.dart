@@ -38,7 +38,6 @@ class _BlankScreenState extends State<BlankScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Nenhum código para exportar'),
-          backgroundColor: Colors.orange,
         ),
       );
       return;
@@ -50,7 +49,6 @@ class _BlankScreenState extends State<BlankScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Códigos exportados com sucesso!'),
-            backgroundColor: Colors.green,
           ),
         );
       }
@@ -59,7 +57,6 @@ class _BlankScreenState extends State<BlankScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erro ao exportar: $e'),
-            backgroundColor: Colors.red,
           ),
         );
       }
@@ -72,7 +69,6 @@ class _BlankScreenState extends State<BlankScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Lista de Códigos'),
         actions: [
           IconButton(
@@ -127,7 +123,7 @@ class _BlankScreenState extends State<BlankScreen> {
           ? const Center(
               child: Text(
                 'Nenhum código escaneado ainda',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+                style: TextStyle(fontSize: 16),
               ),
             )
           : BarcodeListWidget(

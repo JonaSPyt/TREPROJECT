@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../utils/barcode_manager.dart';
+import '../widgets/status_selector_dialog.dart';
 
 class ScannerScreen extends StatefulWidget {
   final BarcodeManager barcodeManager;
@@ -31,7 +32,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Scanner de Código'),
       ),
       body: Column(
@@ -41,7 +41,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
               children: [
                 MobileScanner(
                   controller: _controller,
-                  onDetect: (capture) {
+                  onDetect: (capture) async {
                     if (!_isScanning) return;
                     final List<Barcode> barcodes = capture.barcodes;
                     if (barcodes.isNotEmpty) {
@@ -57,43 +57,92 @@ class _ScannerScreenState extends State<ScannerScreen> {
                         _isScanning = false;
                       });
 
-                      // Decide what to add:
-                      // - If truncated is non-empty and neither truncated nor raw exist, add truncated.
-                      // - Else if raw is non-empty and not present, add raw.
-                      // - Else report duplicate or invalid.
-                      final hasRaw = widget.barcodeManager.containsBarcode(raw);
+                      // Determine presence of raw and truncated
+                      final hasRaw = raw.isNotEmpty && widget.barcodeManager.containsBarcode(raw);
                       final hasTrunc = truncated.isNotEmpty && widget.barcodeManager.containsBarcode(truncated);
 
+                      // Decide code to add (new) or existing code (duplicate)
+                      String? codeToAdd;
+                      String? existingCode;
                       if (truncated.isNotEmpty && !hasTrunc && !hasRaw) {
-                        final wasAdded = widget.barcodeManager.addBarcode(truncated);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(wasAdded
-                                ? 'Código (truncado) inserido na lista: $truncated'
-                                : 'Código já adicionado anteriormente'),
-                            backgroundColor: wasAdded ? Colors.green : Colors.orange,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
+                        codeToAdd = truncated;
                       } else if (raw.isNotEmpty && !hasRaw && !hasTrunc) {
-                        final wasAdded = widget.barcodeManager.addBarcode(raw);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(wasAdded
-                                ? 'Código inserido na lista: $raw'
-                                : 'Código já adicionado anteriormente'),
-                            backgroundColor: wasAdded ? Colors.green : Colors.orange,
-                            duration: const Duration(seconds: 2),
+                        codeToAdd = raw;
+                      } else if (hasRaw || hasTrunc) {
+                        existingCode = hasRaw ? raw : truncated;
+                      }
+
+                      if (codeToAdd != null) {
+                        // Ask user to select a status before adding
+                        final chosen = await pickBarcodeStatus(context, title: 'Selecione o status do código');
+                        if (chosen != null) {
+                          final wasAdded = widget.barcodeManager.addBarcodeItem(
+                            BarcodeItem(code: codeToAdd, status: chosen),
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  wasAdded
+                                      ? 'Código inserido: $codeToAdd (status: ${chosen.label})'
+                                      : 'Código já adicionado anteriormente',
+                                ),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      } else if (existingCode != null) {
+                        // Ask whether to keep or change status
+                        final action = await showDialog<String>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Código já existente'),
+                            content: const Text('Deseja manter o status atual ou alterar?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, 'keep'),
+                                child: const Text('Manter'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, 'change'),
+                                child: const Text('Alterar'),
+                              ),
+                            ],
                           ),
                         );
+
+                        if (action == 'change') {
+                          final chosen = await pickBarcodeStatus(context, title: 'Selecione o novo status');
+                          if (chosen != null) {
+                            widget.barcodeManager.updateBarcodeStatus(existingCode, chosen);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Status atualizado para: ${chosen.label}'),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          }
+                        } else if (action == 'keep') {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Mantido status atual.'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        }
                       } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Código já adicionado anteriormente ou inválido.'),
-                            backgroundColor: Colors.orange,
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
+                        // invalid empty read
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Leitura inválida.'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
                       }
                     }
                   },
@@ -117,7 +166,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
           ),
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.grey[200],
+            color: Theme.of(context).colorScheme.surfaceVariant,
             width: double.infinity,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

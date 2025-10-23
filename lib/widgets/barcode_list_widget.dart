@@ -75,12 +75,12 @@ class BarcodeListWidget extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.label, color: Colors.blue),
+                  icon: Icon(Icons.label, color: Theme.of(context).colorScheme.primary),
                   tooltip: 'Alterar status',
                   onPressed: () => _showStatusDialog(context, item),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
                   onPressed: () => onDelete(item.code),
                 ),
               ],
