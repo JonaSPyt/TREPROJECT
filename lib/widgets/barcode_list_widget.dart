@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import '../utils/barcode_manager.dart';
 
 class BarcodeListWidget extends StatelessWidget {
@@ -6,6 +7,7 @@ class BarcodeListWidget extends StatelessWidget {
   final Function(String) onDelete;
   final Function(String, BarcodeStatus) onStatusChange;
   final void Function(BarcodeItem)? onTapItem;
+  final String? Function(String code)? getPhotoPath;
 
   const BarcodeListWidget({
     super.key,
@@ -13,6 +15,7 @@ class BarcodeListWidget extends StatelessWidget {
     required this.onDelete,
     required this.onStatusChange,
     this.onTapItem,
+    this.getPhotoPath,
   });
 
   void _showStatusDialog(BuildContext context, BarcodeItem item) {
@@ -55,14 +58,25 @@ class BarcodeListWidget extends StatelessWidget {
       itemCount: barcodes.length,
       itemBuilder: (context, index) {
         final item = barcodes[index];
+        final photoPath = getPhotoPath?.call(item.code);
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           color: item.status.color.withOpacity(0.1),
           child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: item.status.color,
-              child: Text('${index + 1}'),
-            ),
+            leading: photoPath != null && photoPath.isNotEmpty
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image(
+                      image: FileImage(File(photoPath)),
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : CircleAvatar(
+                    backgroundColor: item.status.color,
+                    child: Text('${index + 1}'),
+                  ),
             title: Text(item.code),
             onTap: onTapItem == null ? null : () => onTapItem!(item),
             subtitle: item.status != BarcodeStatus.none

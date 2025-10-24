@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../utils/barcode_manager.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:path_provider/path_provider.dart';
 import '../widgets/status_selector_dialog.dart';
 
 class ScannerScreen extends StatefulWidget {
@@ -15,7 +18,74 @@ class ScannerScreen extends StatefulWidget {
 class _ScannerScreenState extends State<ScannerScreen> {
   String _barcode = 'Nenhum código lido ainda';
   bool _isScanning = true;
-  final MobileScannerController _controller = MobileScannerController();
+  final MobileScannerController _controller = MobileScannerController(
+    returnImage: true,
+  );
+
+  Future<bool?> _confirmFrameOk(Uint8List bytes, String code) async {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Esta foto está ok?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.memory(
+                bytes,
+                width: 320,
+                height: 240,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Código: $code',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveCaptureImageForCode(List<int> bytes, String code) async {
+    try {
+      final docs = await getApplicationDocumentsDirectory();
+      final photosDir = Directory('${docs.path}/photos');
+      if (!await photosDir.exists()) {
+        await photosDir.create(recursive: true);
+      }
+      final String filename = '${DateTime.now().millisecondsSinceEpoch}_$code.jpg';
+      final File dest = File('${photosDir.path}/$filename');
+      await dest.writeAsBytes(bytes, flush: true);
+
+      await widget.barcodeManager.setPhotoForCode(code, dest.path);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Foto vinculada com sucesso.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Falha ao salvar foto: $e')),
+        );
+      }
+    }
+  }
 
   void _toggleScanning() {
     setState(() {
@@ -46,6 +116,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                     final List<Barcode> barcodes = capture.barcodes;
                     if (barcodes.isNotEmpty) {
                       final String raw = barcodes.first.rawValue ?? '';
+                      final Uint8List? frameBytes = capture.image;
                       // Prepare truncated version (strip first 3 chars and leading zeros)
                       String truncated = raw.length > 3 ? raw.substring(3) : '';
                       truncated = truncated.replaceFirst(RegExp(r'^0+'), '');
@@ -89,6 +160,15 @@ class _ScannerScreenState extends State<ScannerScreen> {
                               duration: const Duration(seconds: 2),
                             ),
                           );
+
+                          // For NEW codes: confirm current scanner frame before linking as photo
+                          final existingPhoto = widget.barcodeManager.getPhotoPath(codeToAdd);
+                          if ((existingPhoto == null || existingPhoto.isEmpty) && frameBytes != null) {
+                            final ok = await _confirmFrameOk(frameBytes, codeToAdd);
+                            if (ok == true) {
+                              await _saveCaptureImageForCode(frameBytes, codeToAdd);
+                            }
+                          }
                         }
                       } else if (existingCode != null) {
                         // Ask whether to keep or change status
@@ -131,6 +211,15 @@ class _ScannerScreenState extends State<ScannerScreen> {
                                 duration: Duration(seconds: 2),
                               ),
                             );
+                          }
+                        }
+
+                        // If existing code has no photo, confirm the current frame before linking
+                        final existingPhoto = widget.barcodeManager.getPhotoPath(existingCode);
+                        if ((existingPhoto == null || existingPhoto.isEmpty) && frameBytes != null) {
+                          final ok = await _confirmFrameOk(frameBytes, existingCode);
+                          if (ok == true) {
+                            await _saveCaptureImageForCode(frameBytes, existingCode);
                           }
                         }
                       } else {

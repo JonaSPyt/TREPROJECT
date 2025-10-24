@@ -41,9 +41,21 @@ class BarcodeItem {
 class BarcodeManager extends ChangeNotifier {
   final List<BarcodeItem> _barcodes = [];
   final Map<String, AssetDetails> _detailsByCode = {};
+  final Map<String, String> _photoByCode = {};
 
   List<BarcodeItem> get barcodes => List.unmodifiable(_barcodes);
   AssetDetails? getDetails(String code) => _detailsByCode[code];
+  String? getPhotoPath(String code) => _photoByCode[code];
+  Future<void> setPhotoForCode(String code, String path) async {
+    _photoByCode[code] = path;
+    notifyListeners();
+    await _savePhotosToStorage();
+  }
+  Future<void> removePhotoForCode(String code) async {
+    _photoByCode.remove(code);
+    notifyListeners();
+    await _savePhotosToStorage();
+  }
   void mergeDetails(Map<String, AssetDetails> map) {
     _detailsByCode.addAll(map);
     notifyListeners();
@@ -122,6 +134,11 @@ class BarcodeManager extends ChangeNotifier {
     return File('${dir.path}/details.json');
   }
 
+  Future<File> _getPhotosStorageFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/photos.json');
+  }
+
   /// Load saved items into the manager (replaces current in-memory list)
   Future<void> loadFromStorage() async {
     try {
@@ -165,6 +182,25 @@ class BarcodeManager extends ChangeNotifier {
       } catch (_) {
         // ignore details load errors
       }
+
+      // Load photos file (optional)
+      try {
+        final photosFile = await _getPhotosStorageFile();
+        if (await photosFile.exists()) {
+          final pContent = await photosFile.readAsString();
+          final pDecoded = jsonDecode(pContent);
+          if (pDecoded is Map) {
+            _photoByCode.clear();
+            pDecoded.forEach((key, value) {
+              if (value != null) {
+                _photoByCode[key.toString()] = value.toString();
+              }
+            });
+          }
+        }
+      } catch (_) {
+        // ignore photo load errors
+      }
       notifyListeners();
     } catch (_) {
       // ignore read/parse errors
@@ -188,6 +224,15 @@ class BarcodeManager extends ChangeNotifier {
         for (final entry in _detailsByCode.entries) entry.key: entry.value.toMap(),
       };
       await file.writeAsString(jsonEncode(map), flush: true);
+    } catch (_) {
+      // ignore write errors
+    }
+  }
+
+  Future<void> _savePhotosToStorage() async {
+    try {
+      final file = await _getPhotosStorageFile();
+      await file.writeAsString(jsonEncode(_photoByCode), flush: true);
     } catch (_) {
       // ignore write errors
     }
