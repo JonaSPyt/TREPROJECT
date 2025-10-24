@@ -40,8 +40,15 @@ class BarcodeItem {
 
 class BarcodeManager extends ChangeNotifier {
   final List<BarcodeItem> _barcodes = [];
+  final Map<String, AssetDetails> _detailsByCode = {};
 
   List<BarcodeItem> get barcodes => List.unmodifiable(_barcodes);
+  AssetDetails? getDetails(String code) => _detailsByCode[code];
+  void mergeDetails(Map<String, AssetDetails> map) {
+    _detailsByCode.addAll(map);
+    // Not persisting details for now; they come from the CSV import session.
+    notifyListeners();
+  }
 
   /// Returns true if a barcode with [code] already exists in the manager.
   bool containsBarcode(String code) {
@@ -142,4 +149,23 @@ class BarcodeManager extends ChangeNotifier {
       // ignore write errors
     }
   }
+}
+
+/// Additional metadata parsed from CSV for a given patrimony code.
+class AssetDetails {
+  final String code; // Patrimônio
+  final String? oldCode; // P. Antigo
+  final String? descricao;
+  final String? localizacao;
+  final String? valorAquisicao;
+  final String? item; // Item id/sequence if present
+
+  AssetDetails({
+    required this.code,
+    this.oldCode,
+    this.descricao,
+    this.localizacao,
+    this.valorAquisicao,
+    this.item,
+  });
 }

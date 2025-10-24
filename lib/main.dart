@@ -98,7 +98,10 @@ class HomeScreen extends StatelessWidget {
           final file = result.files.single;
           final bytes = file.bytes;
           if (bytes == null) return;
-          final items = CsvImportService.parseCsv(bytes);
+          final parsed = CsvImportService.parseCsvWithDetails(bytes);
+          // Merge details first so list taps can show info immediately
+          barcodeManager.mergeDetails(parsed.detailsByCode);
+          final items = parsed.items;
           if (!context.mounted) return;
 
           if (items.isEmpty) {

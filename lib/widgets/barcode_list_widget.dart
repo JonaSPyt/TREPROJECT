@@ -5,12 +5,14 @@ class BarcodeListWidget extends StatelessWidget {
   final List<BarcodeItem> barcodes;
   final Function(String) onDelete;
   final Function(String, BarcodeStatus) onStatusChange;
+  final void Function(BarcodeItem)? onTapItem;
 
   const BarcodeListWidget({
     super.key,
     required this.barcodes,
     required this.onDelete,
     required this.onStatusChange,
+    this.onTapItem,
   });
 
   void _showStatusDialog(BuildContext context, BarcodeItem item) {
@@ -62,6 +64,7 @@ class BarcodeListWidget extends StatelessWidget {
               child: Text('${index + 1}'),
             ),
             title: Text(item.code),
+            onTap: onTapItem == null ? null : () => onTapItem!(item),
             subtitle: item.status != BarcodeStatus.none
                 ? Text(
                     item.status.label,

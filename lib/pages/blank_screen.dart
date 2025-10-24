@@ -134,7 +134,73 @@ class _BlankScreenState extends State<BlankScreen> {
               onStatusChange: (barcode, status) {
                 widget.barcodeManager.updateBarcodeStatus(barcode, status);
               },
+              onTapItem: (item) {
+                final details = widget.barcodeManager.getDetails(item.code);
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                  ),
+                  builder: (context) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Detalhes do Patrimônio', style: Theme.of(context).textTheme.titleLarge),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text('Código: ${item.code}', style: Theme.of(context).textTheme.bodyMedium),
+                          const SizedBox(height: 12),
+                          if (details != null) ...[
+                            _detailRow(context, 'Item', details.item),
+                            _detailRow(context, 'P. Antigo', details.oldCode),
+                            _detailRow(context, 'Descrição', details.descricao),
+                            _detailRow(context, 'Localização', details.localizacao),
+                            _detailRow(context, 'Vlr. Aquisição', details.valorAquisicao),
+                          ] else ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Text('Sem detalhes do CSV para este código.',
+                                  style: Theme.of(context).textTheme.bodyMedium),
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
             ),
     );
   }
+}
+
+Widget _detailRow(BuildContext context, String label, String? value) {
+  if (value == null || value.isEmpty) return const SizedBox.shrink();
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 130,
+          child: Text(label, style: Theme.of(context).textTheme.labelMedium),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Text(value)),
+      ],
+    ),
+  );
 }
