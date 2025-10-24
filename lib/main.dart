@@ -40,7 +40,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tela Inicial'),
+        title: const Text('Tela Iniciall'),
       ),
       body: Center(
         child: Column(

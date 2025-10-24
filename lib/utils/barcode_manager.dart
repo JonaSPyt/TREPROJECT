@@ -46,8 +46,9 @@ class BarcodeManager extends ChangeNotifier {
   AssetDetails? getDetails(String code) => _detailsByCode[code];
   void mergeDetails(Map<String, AssetDetails> map) {
     _detailsByCode.addAll(map);
-    // Not persisting details for now; they come from the CSV import session.
     notifyListeners();
+    // persist asynchronously
+    Future.microtask(() => _saveDetailsToStorage());
   }
 
   /// Returns true if a barcode with [code] already exists in the manager.
@@ -93,22 +94,32 @@ class BarcodeManager extends ChangeNotifier {
 
   void removeBarcode(String barcode) {
     _barcodes.removeWhere((item) => item.code == barcode);
+    // Remove associated details to avoid stale data
+    _detailsByCode.remove(barcode);
     notifyListeners();
   // persist asynchronously
   Future.microtask(() => _saveToStorage());
+  Future.microtask(() => _saveDetailsToStorage());
   }
 
   void clearAll() {
     _barcodes.clear();
+    _detailsByCode.clear();
     notifyListeners();
     // persist asynchronously
     Future.microtask(() => _saveToStorage());
+    Future.microtask(() => _saveDetailsToStorage());
   }
 
   // Storage helpers
   Future<File> _getStorageFile() async {
   final dir = await getApplicationDocumentsDirectory();
   return File('${dir.path}/items.json');
+  }
+
+  Future<File> _getDetailsStorageFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/details.json');
   }
 
   /// Load saved items into the manager (replaces current in-memory list)
@@ -133,8 +144,28 @@ class BarcodeManager extends ChangeNotifier {
         _barcodes.addAll(decoded
             .whereType<Map<String, dynamic>>()
             .map((m) => BarcodeItem.fromMap(m)));
-        notifyListeners();
       }
+      // Load details file (optional)
+      try {
+        final detailsFile = await _getDetailsStorageFile();
+        if (await detailsFile.exists()) {
+          final dContent = await detailsFile.readAsString();
+          final dDecoded = jsonDecode(dContent);
+          if (dDecoded is Map) {
+            _detailsByCode.clear();
+            dDecoded.forEach((key, value) {
+              if (value is Map<String, dynamic>) {
+                _detailsByCode[key] = AssetDetails.fromMap(value)..code;
+              } else if (value is Map) {
+                _detailsByCode[key] = AssetDetails.fromMap(value.map((k, v) => MapEntry(k.toString(), v)));
+              }
+            });
+          }
+        }
+      } catch (_) {
+        // ignore details load errors
+      }
+      notifyListeners();
     } catch (_) {
       // ignore read/parse errors
     }
@@ -145,6 +176,18 @@ class BarcodeManager extends ChangeNotifier {
       final file = await _getStorageFile();
       final jsonList = _barcodes.map((e) => e.toMap()).toList();
       await file.writeAsString(jsonEncode(jsonList), flush: true);
+    } catch (_) {
+      // ignore write errors
+    }
+  }
+
+  Future<void> _saveDetailsToStorage() async {
+    try {
+      final file = await _getDetailsStorageFile();
+      final map = <String, dynamic>{
+        for (final entry in _detailsByCode.entries) entry.key: entry.value.toMap(),
+      };
+      await file.writeAsString(jsonEncode(map), flush: true);
     } catch (_) {
       // ignore write errors
     }
@@ -168,4 +211,24 @@ class AssetDetails {
     this.valorAquisicao,
     this.item,
   });
+
+  Map<String, dynamic> toMap() => {
+        'code': code,
+        'oldCode': oldCode,
+        'descricao': descricao,
+        'localizacao': localizacao,
+        'valorAquisicao': valorAquisicao,
+        'item': item,
+      };
+
+  factory AssetDetails.fromMap(Map<String, dynamic> map) {
+    return AssetDetails(
+      code: map['code']?.toString() ?? '',
+      oldCode: map['oldCode']?.toString(),
+      descricao: map['descricao']?.toString(),
+      localizacao: map['localizacao']?.toString(),
+      valorAquisicao: map['valorAquisicao']?.toString(),
+      item: map['item']?.toString(),
+    );
+  }
 }
