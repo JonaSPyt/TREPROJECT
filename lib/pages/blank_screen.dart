@@ -86,7 +86,7 @@ class _BlankScreenState extends State<BlankScreen> {
     }
 
     try {
-      await BarcodeExporter.exportBarcodes(barcodes);
+      await BarcodeExporter.exportBarcodes(barcodes, manager: widget.barcodeManager);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

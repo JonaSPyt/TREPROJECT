@@ -15,10 +15,11 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
-adb uninstall com.example.treproject
-flutter clean
-rm -rf android/.gradle build .dart_tool
-flutter pub get
-flutter build apk --debug
-adb install -r build/app/outputs/flutter-apk/app-debug.apk
-flutter run -d RXCW60554JJ --use-application-binary build/app/outputs/flutter-apk/app-debug.apk
+
+## Exportação de códigos e fotos
+
+- Ao tocar no botão de compartilhar na tela de lista, o app gera uma pasta temporária contendo:
+	- Um arquivo `codigos_barras.txt` com a listagem dos códigos e status.
+	- Todas as fotos anexadas, com o nome do arquivo sendo o próprio código (extensão preservada quando possível).
+- Por limitações de compartilhamento no Android/iOS, essa pasta é compactada automaticamente em um arquivo `.zip` e então compartilhada.
+- O nome do arquivo gerado segue o formato `exportacao_<timestamp>.zip`.
