@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1016473191297",
+    "project_id": "treteste-b0b5b",
+    "storage_bucket": "treteste-b0b5b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1016473191297:android:9cfc37dda5db30a1eade80",
+        "android_client_info": {
+          "package_name": "com.example.treproject"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCVOMmidqPOK4rjstwHKa0nzS-d0JsVJIc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

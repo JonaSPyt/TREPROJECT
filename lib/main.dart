@@ -1,32 +1,71 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'pages/scanner_screen.dart';
 import 'pages/blank_screen.dart';
-// Third screen removed; functionality merged into BlankScreen
 import 'utils/barcode_manager.dart';
+import 'services/sync_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'services/csv_import_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   final manager = BarcodeManager();
   await manager.loadFromStorage();
-  runApp(MyApp(barcodeManager: manager));
+
+  const projectId = 'patrimonio-projeto-compartilhado';
+
+  final syncService = SyncService(
+    barcodeManager: manager,
+    projectId: projectId,
+  );
+
+  manager.setSyncService(syncService);
+
+  // CORREÇÃO: Carrega TANTO items quanto details do Firestore
+  print('🔥 Iniciando carregamento do Firestore...');
+  await syncService.loadItems(); // ← NOVO: Carrega códigos escaneados
+  await syncService.loadDetails(); // ← Carrega detalhes do CSV
+  print('✅ Carregamento inicial concluído!');
+
+  runApp(MyApp(barcodeManager: manager, syncService: syncService));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final BarcodeManager barcodeManager;
+  final SyncService syncService;
 
-  const MyApp({super.key, required this.barcodeManager});
+  const MyApp({
+    super.key,
+    required this.barcodeManager,
+    required this.syncService,
+  });
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Inicia sincronização em tempo real
+    widget.syncService.listenToChanges().listen((_) {});
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
-      home: HomeScreen(barcodeManager: barcodeManager),
+      home: HomeScreen(barcodeManager: widget.barcodeManager),
     );
   }
 }
@@ -39,9 +78,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tela Inicial'),
-      ),
+      appBar: AppBar(title: const Text('Tela Inicial')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -83,62 +120,84 @@ class HomeScreen extends StatelessWidget {
               ),
               child: const Text('Outra Tela', style: TextStyle(fontSize: 18)),
             ),
-            // (Third screen removed)
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final result = await FilePicker.platform.pickFiles(
-            type: FileType.custom,
-            allowedExtensions: ['csv'],
-            withData: true,
-          );
-          if (result == null || result.files.isEmpty) return;
-          final file = result.files.single;
-          final bytes = file.bytes;
-          if (bytes == null) return;
-          final parsed = CsvImportService.parseCsvWithDetails(bytes);
-          // Merge details first so list taps can show info immediately
-          barcodeManager.mergeDetails(parsed.detailsByCode);
-          final items = parsed.items;
-          if (!context.mounted) return;
-
-          if (items.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('CSV não contém patrimônios válidos.')),
+          try {
+            final result = await FilePicker.platform.pickFiles(
+              type: FileType.custom,
+              allowedExtensions: ['csv'],
+              withData: true,
             );
-            return;
-          }
 
-          // Merge parsed items into shared BarcodeManager, skipping duplicates
-          int added = 0;
-          int skipped = 0;
-          for (final it in items) {
-            final wasAdded = barcodeManager.addBarcodeItem(it);
-            if (wasAdded) {
-              added++;
-            } else {
-              skipped++;
+            if (result == null || result.files.isEmpty) return;
+
+            final file = result.files.single;
+            final bytes = file.bytes;
+
+            if (bytes == null) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Erro ao ler arquivo CSV.')),
+                );
+              }
+              return;
+            }
+
+            final parsed = CsvImportService.parseCsvWithDetails(bytes);
+            barcodeManager.mergeDetails(parsed.detailsByCode);
+            final items = parsed.items;
+
+            if (!context.mounted) return;
+
+            if (items.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('CSV não contém patrimônios válidos.'),
+                ),
+              );
+              return;
+            }
+
+            int added = 0;
+            int skipped = 0;
+            for (final it in items) {
+              final wasAdded = barcodeManager.addBarcodeItem(it);
+              if (wasAdded) {
+                added++;
+              } else {
+                skipped++;
+              }
+            }
+
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Importado: $added, Ignorados: $skipped'),
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      BlankScreen(barcodeManager: barcodeManager),
+                ),
+              );
+            }
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Erro ao importar CSV: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
             }
           }
-
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Importado: $added, Ignorados: $skipped'),
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
-
-          // Open the combined list screen (BlankScreen) so user sees merged result
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => BlankScreen(barcodeManager: barcodeManager),
-            ),
-          );
         },
         child: const Icon(Icons.add),
       ),

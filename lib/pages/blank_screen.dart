@@ -50,7 +50,8 @@ class _BlankScreenState extends State<BlankScreen> {
       if (!await photosDir.exists()) {
         await photosDir.create(recursive: true);
       }
-      final String filename = '${DateTime.now().millisecondsSinceEpoch}_$code.jpg';
+      final String filename =
+          '${DateTime.now().millisecondsSinceEpoch}_$code.jpg';
       final File dest = File('${photosDir.path}/$filename');
       await File(picked.path).copy(dest.path);
 
@@ -65,9 +66,9 @@ class _BlankScreenState extends State<BlankScreen> {
       return dest.path;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao vincular foto: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao vincular foto: $e')));
       }
       return null;
     }
@@ -78,29 +79,26 @@ class _BlankScreenState extends State<BlankScreen> {
 
     if (barcodes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nenhum código para exportar'),
-        ),
+        const SnackBar(content: Text('Nenhum código para exportar')),
       );
       return;
     }
 
     try {
-      await BarcodeExporter.exportBarcodes(barcodes, manager: widget.barcodeManager);
+      await BarcodeExporter.exportBarcodes(
+        barcodes,
+        manager: widget.barcodeManager,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Códigos exportados com sucesso!'),
-          ),
+          const SnackBar(content: Text('Códigos exportados com sucesso!')),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao exportar: $e'),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao exportar: $e')));
       }
     }
   }
@@ -120,9 +118,8 @@ class _BlankScreenState extends State<BlankScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ScannerScreen(
-                    barcodeManager: widget.barcodeManager,
-                  ),
+                  builder: (context) =>
+                      ScannerScreen(barcodeManager: widget.barcodeManager),
                 ),
               );
             },
@@ -182,13 +179,18 @@ class _BlankScreenState extends State<BlankScreen> {
                   context: context,
                   isScrollControlled: true,
                   shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
                   ),
                   builder: (context) {
                     return StatefulBuilder(
                       builder: (context, setModalState) {
-                        final details = widget.barcodeManager.getDetails(item.code);
-                        final currentPhotoPath = widget.barcodeManager.getPhotoPath(item.code);
+                        final details = widget.barcodeManager.getDetails(
+                          item.code,
+                        );
+                        final currentPhotoPath = widget.barcodeManager
+                            .getPhotoPath(item.code);
                         return Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                           child: Column(
@@ -196,9 +198,15 @@ class _BlankScreenState extends State<BlankScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('Detalhes do Patrimônio', style: Theme.of(context).textTheme.titleLarge),
+                                  Text(
+                                    'Detalhes do Patrimônio',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleLarge,
+                                  ),
                                   IconButton(
                                     icon: const Icon(Icons.close),
                                     onPressed: () => Navigator.pop(context),
@@ -206,9 +214,13 @@ class _BlankScreenState extends State<BlankScreen> {
                                 ],
                               ),
                               const SizedBox(height: 4),
-                              Text('Código: ${item.code}', style: Theme.of(context).textTheme.bodyMedium),
+                              Text(
+                                'Código: ${item.code}',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
                               const SizedBox(height: 12),
-                              if (currentPhotoPath != null && currentPhotoPath.isNotEmpty) ...[
+                              if (currentPhotoPath != null &&
+                                  currentPhotoPath.isNotEmpty) ...[
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
                                   child: Image.file(
@@ -228,7 +240,9 @@ class _BlankScreenState extends State<BlankScreen> {
                                           builder: (context) => Dialog(
                                             clipBehavior: Clip.antiAlias,
                                             child: InteractiveViewer(
-                                              child: Image.file(File(currentPhotoPath)),
+                                              child: Image.file(
+                                                File(currentPhotoPath),
+                                              ),
                                             ),
                                           ),
                                         );
@@ -239,7 +253,11 @@ class _BlankScreenState extends State<BlankScreen> {
                                     const SizedBox(width: 12),
                                     ElevatedButton.icon(
                                       onPressed: () {
-                                        Share.shareXFiles([XFile(currentPhotoPath)], text: 'Foto do patrimônio ${item.code}');
+                                        Share.shareXFiles(
+                                          [XFile(currentPhotoPath)],
+                                          text:
+                                              'Foto do patrimônio ${item.code}',
+                                        );
                                       },
                                       icon: const Icon(Icons.share),
                                       label: const Text('Compartilhar'),
@@ -252,7 +270,10 @@ class _BlankScreenState extends State<BlankScreen> {
                                   children: [
                                     ElevatedButton.icon(
                                       onPressed: () async {
-                                        final path = await _pickAndLinkPhoto(item.code, ImageSource.gallery);
+                                        final path = await _pickAndLinkPhoto(
+                                          item.code,
+                                          ImageSource.gallery,
+                                        );
                                         if (path != null) setModalState(() {});
                                       },
                                       icon: const Icon(Icons.photo_library),
@@ -261,7 +282,10 @@ class _BlankScreenState extends State<BlankScreen> {
                                     const SizedBox(width: 12),
                                     ElevatedButton.icon(
                                       onPressed: () async {
-                                        final path = await _pickAndLinkPhoto(item.code, ImageSource.camera);
+                                        final path = await _pickAndLinkPhoto(
+                                          item.code,
+                                          ImageSource.camera,
+                                        );
                                         if (path != null) setModalState(() {});
                                       },
                                       icon: const Icon(Icons.photo_camera),
@@ -272,16 +296,40 @@ class _BlankScreenState extends State<BlankScreen> {
                                 const SizedBox(height: 12),
                               ],
                               if (details != null) ...[
-                                _detailRow(context, 'Item', details.item),
-                                _detailRow(context, 'P. Antigo', details.oldCode),
-                                _detailRow(context, 'Descrição', details.descricao),
-                                _detailRow(context, 'Localização', details.localizacao),
-                                _detailRow(context, 'Vlr. Aquisição', details.valorAquisicao),
+                                if (details.item != null &&
+                                    details.item!.isNotEmpty)
+                                  _detailRow(context, 'Item', details.item),
+                                _detailRow(
+                                  context,
+                                  'P. Antigo',
+                                  details.oldCode,
+                                ),
+                                _detailRow(
+                                  context,
+                                  'Descrição',
+                                  details.descricao,
+                                ),
+                                _detailRow(
+                                  context,
+                                  'Localização',
+                                  details.localizacao,
+                                ),
+                                _detailRow(
+                                  context,
+                                  'Vlr. Aquisição',
+                                  details.valorAquisicao,
+                                ),
                               ] else ...[
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  child: Text('Sem detalhes do CSV para este código.',
-                                      style: Theme.of(context).textTheme.bodyMedium),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  child: Text(
+                                    'Sem detalhes do CSV para este código.',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                  ),
                                 ),
                               ],
                               const SizedBox(height: 8),
