@@ -2,7 +2,8 @@
 // ignore_for_file: type=lint
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb, TargetPlatform;
+  show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 class DefaultFirebaseOptions {
@@ -28,24 +29,28 @@ class DefaultFirebaseOptions {
     }
   }
 
-  // SUBSTITUA com as configurações do Firebase Console
-  // Acesse: https://console.firebase.google.com/
-  // Projeto > Configurações > Seus apps > Android
+  static FirebaseOptions get android => FirebaseOptions(
+        apiKey: _envOrThrow('FIREBASE_ANDROID_API_KEY'),
+        appId: _envOrThrow('FIREBASE_ANDROID_APP_ID'),
+        messagingSenderId: _envOrThrow('FIREBASE_ANDROID_MESSAGING_SENDER_ID'),
+        projectId: _envOrThrow('FIREBASE_ANDROID_PROJECT_ID'),
+        storageBucket: _envOrThrow('FIREBASE_ANDROID_STORAGE_BUCKET'),
+      );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCVOMmidqPOK4rjstwHKa0nzS-d0JsVJIc',
-    appId: '1:1016473191297:android:9cfc37dda5db30a1eade80',
-    messagingSenderId: '1016473191297',
-    projectId: 'treteste-b0b5b',
-    storageBucket: 'treteste-b0b5b.firebasestorage.app',
-  );
+  static FirebaseOptions get ios => FirebaseOptions(
+        apiKey: _envOrThrow('FIREBASE_IOS_API_KEY'),
+        appId: _envOrThrow('FIREBASE_IOS_APP_ID'),
+        messagingSenderId: _envOrThrow('FIREBASE_IOS_MESSAGING_SENDER_ID'),
+        projectId: _envOrThrow('FIREBASE_IOS_PROJECT_ID'),
+        storageBucket: _envOrThrow('FIREBASE_IOS_STORAGE_BUCKET'),
+        iosBundleId: _envOrThrow('FIREBASE_IOS_BUNDLE_ID'),
+      );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCVOMmidqPOK4rjstwHKa0nzS-d0JsVJIc',
-    appId: '1:1016473191297:ios:XXXXX',
-    messagingSenderId: '1016473191297',
-    projectId: 'treteste-b0b5b',
-    storageBucket: 'treteste-b0b5b.firebasestorage.app',
-    iosBundleId: 'com.example.treproject',
-  );
+  static String _envOrThrow(String key) {
+    final value = dotenv.env[key];
+    if (value == null || value.isEmpty) {
+      throw StateError('Variável de ambiente "$key" não encontrada ou vazia.');
+    }
+    return value;
+  }
 }

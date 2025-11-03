@@ -231,7 +231,9 @@ class _BlankScreenState extends State<BlankScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                Row(
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 8,
                                   children: [
                                     ElevatedButton.icon(
                                       onPressed: () {
@@ -250,7 +252,6 @@ class _BlankScreenState extends State<BlankScreen> {
                                       icon: const Icon(Icons.photo),
                                       label: const Text('Ver foto'),
                                     ),
-                                    const SizedBox(width: 12),
                                     ElevatedButton.icon(
                                       onPressed: () {
                                         Share.shareXFiles(
@@ -261,6 +262,47 @@ class _BlankScreenState extends State<BlankScreen> {
                                       },
                                       icon: const Icon(Icons.share),
                                       label: const Text('Compartilhar'),
+                                    ),
+                                    ElevatedButton.icon(
+                                      onPressed: () async {
+                                        final path = await _pickAndLinkPhoto(
+                                          item.code,
+                                          ImageSource.gallery,
+                                        );
+                                        if (path != null) setModalState(() {});
+                                      },
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('Trocar (galeria)'),
+                                    ),
+                                    ElevatedButton.icon(
+                                      onPressed: () async {
+                                        final path = await _pickAndLinkPhoto(
+                                          item.code,
+                                          ImageSource.camera,
+                                        );
+                                        if (path != null) setModalState(() {});
+                                      },
+                                      icon: const Icon(Icons.camera_alt),
+                                      label: const Text('Trocar (câmera)'),
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed: () async {
+                                        await widget.barcodeManager
+                                            .removePhotoForCode(item.code);
+                                        setModalState(() {});
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Foto removida do patrimônio.',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      icon: const Icon(Icons.delete_outline),
+                                      label: const Text('Remover foto'),
                                     ),
                                   ],
                                 ),
