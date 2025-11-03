@@ -40,10 +40,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Código: $code',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            Text('Código: $code', style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
         actions: [
@@ -67,7 +64,8 @@ class _ScannerScreenState extends State<ScannerScreen> {
       if (!await photosDir.exists()) {
         await photosDir.create(recursive: true);
       }
-      final String filename = '${DateTime.now().millisecondsSinceEpoch}_$code.jpg';
+      final String filename =
+          '${DateTime.now().millisecondsSinceEpoch}_$code.jpg';
       final File dest = File('${photosDir.path}/$filename');
       await dest.writeAsBytes(bytes, flush: true);
 
@@ -80,9 +78,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Falha ao salvar foto: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Falha ao salvar foto: $e')));
       }
     }
   }
@@ -98,12 +96,47 @@ class _ScannerScreenState extends State<ScannerScreen> {
     });
   }
 
+  Future<String?> _showDescriptionDialog(String code) async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Adicionar Descrição'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Código: $code'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Descrição',
+                hintText: 'Digite uma descrição para este item',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Pular'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Scanner de Código'),
-      ),
+      appBar: AppBar(title: const Text('Scanner de Código')),
       body: Column(
         children: [
           Expanded(
@@ -129,8 +162,12 @@ class _ScannerScreenState extends State<ScannerScreen> {
                       });
 
                       // Determine presence of raw and truncated
-                      final hasRaw = raw.isNotEmpty && widget.barcodeManager.containsBarcode(raw);
-                      final hasTrunc = truncated.isNotEmpty && widget.barcodeManager.containsBarcode(truncated);
+                      final hasRaw =
+                          raw.isNotEmpty &&
+                          widget.barcodeManager.containsBarcode(raw);
+                      final hasTrunc =
+                          truncated.isNotEmpty &&
+                          widget.barcodeManager.containsBarcode(truncated);
 
                       // Decide code to add (new) or existing code (duplicate)
                       String? codeToAdd;
@@ -145,28 +182,61 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
                       if (codeToAdd != null) {
                         // Ask user to select a status before adding
-                        final chosen = await pickBarcodeStatus(context, title: 'Selecione o status do código');
+                        final chosen = await pickBarcodeStatus(
+                          context,
+                          title: 'Selecione o status do código',
+                        );
                         if (chosen != null) {
+                          // Verificar se já existe detalhes para este código
+                          final existingDetails = widget.barcodeManager
+                              .getDetails(codeToAdd);
+
+                          // Se não existe detalhes, perguntar se quer adicionar descrição
+                          if (existingDetails == null) {
+                            final description = await _showDescriptionDialog(
+                              codeToAdd,
+                            );
+                            if (description != null && description.isNotEmpty) {
+                              // Criar um AssetDetails com a descrição fornecida
+                              final newDetails = AssetDetails(
+                                code: codeToAdd,
+                                descricao: description,
+                              );
+                              widget.barcodeManager.mergeDetails({
+                                codeToAdd: newDetails,
+                              });
+                            }
+                          }
+
                           final wasAdded = widget.barcodeManager.addBarcodeItem(
                             BarcodeItem(code: codeToAdd, status: chosen),
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                  wasAdded
-                                      ? 'Código inserido: $codeToAdd (status: ${chosen.label})'
-                                      : 'Código já adicionado anteriormente',
-                                ),
+                                wasAdded
+                                    ? 'Código inserido: $codeToAdd (status: ${chosen.label})'
+                                    : 'Código já adicionado anteriormente',
+                              ),
                               duration: const Duration(seconds: 2),
                             ),
                           );
 
                           // For NEW codes: confirm current scanner frame before linking as photo
-                          final existingPhoto = widget.barcodeManager.getPhotoPath(codeToAdd);
-                          if ((existingPhoto == null || existingPhoto.isEmpty) && frameBytes != null) {
-                            final ok = await _confirmFrameOk(frameBytes, codeToAdd);
+                          final existingPhoto = widget.barcodeManager
+                              .getPhotoPath(codeToAdd);
+                          if ((existingPhoto == null ||
+                                  existingPhoto.isEmpty) &&
+                              frameBytes != null) {
+                            final ok = await _confirmFrameOk(
+                              frameBytes,
+                              codeToAdd,
+                            );
                             if (ok == true) {
-                              await _saveCaptureImageForCode(frameBytes, codeToAdd);
+                              await _saveCaptureImageForCode(
+                                frameBytes,
+                                codeToAdd,
+                              );
                             }
                           }
                         }
@@ -176,14 +246,17 @@ class _ScannerScreenState extends State<ScannerScreen> {
                           context: context,
                           builder: (context) => AlertDialog(
                             title: const Text('Código já existente'),
-                            content: const Text('Deseja manter o status atual ou alterar?'),
+                            content: const Text(
+                              'Deseja manter o status atual ou alterar?',
+                            ),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(context, 'keep'),
                                 child: const Text('Manter'),
                               ),
                               TextButton(
-                                onPressed: () => Navigator.pop(context, 'change'),
+                                onPressed: () =>
+                                    Navigator.pop(context, 'change'),
                                 child: const Text('Alterar'),
                               ),
                             ],
@@ -191,13 +264,21 @@ class _ScannerScreenState extends State<ScannerScreen> {
                         );
 
                         if (action == 'change') {
-                          final chosen = await pickBarcodeStatus(context, title: 'Selecione o novo status');
+                          final chosen = await pickBarcodeStatus(
+                            context,
+                            title: 'Selecione o novo status',
+                          );
                           if (chosen != null) {
-                            widget.barcodeManager.updateBarcodeStatus(existingCode, chosen);
+                            widget.barcodeManager.updateBarcodeStatus(
+                              existingCode,
+                              chosen,
+                            );
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Status atualizado para: ${chosen.label}'),
+                                  content: Text(
+                                    'Status atualizado para: ${chosen.label}',
+                                  ),
                                   duration: const Duration(seconds: 2),
                                 ),
                               );
@@ -215,11 +296,19 @@ class _ScannerScreenState extends State<ScannerScreen> {
                         }
 
                         // If existing code has no photo, confirm the current frame before linking
-                        final existingPhoto = widget.barcodeManager.getPhotoPath(existingCode);
-                        if ((existingPhoto == null || existingPhoto.isEmpty) && frameBytes != null) {
-                          final ok = await _confirmFrameOk(frameBytes, existingCode);
+                        final existingPhoto = widget.barcodeManager
+                            .getPhotoPath(existingCode);
+                        if ((existingPhoto == null || existingPhoto.isEmpty) &&
+                            frameBytes != null) {
+                          final ok = await _confirmFrameOk(
+                            frameBytes,
+                            existingCode,
+                          );
                           if (ok == true) {
-                            await _saveCaptureImageForCode(frameBytes, existingCode);
+                            await _saveCaptureImageForCode(
+                              frameBytes,
+                              existingCode,
+                            );
                           }
                         }
                       } else {
