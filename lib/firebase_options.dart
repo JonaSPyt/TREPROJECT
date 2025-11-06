@@ -5,8 +5,24 @@ import 'package:flutter/foundation.dart'
   show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-/// Default [FirebaseOptions] for use with your Firebase apps.
+/// Configurações padrão do Firebase para uso no aplicativo.
+/// 
+/// IMPORTANTE: Este arquivo NÃO expõe credenciais diretamente.
+/// Todas as chaves sensíveis são lidas do arquivo .env via flutter_dotenv.
+/// 
+/// O arquivo .env está no .gitignore para evitar commit acidental de credenciais.
+/// 
+/// Uso:
+/// ```dart
+/// await Firebase.initializeApp(
+///   options: DefaultFirebaseOptions.currentPlatform
+/// );
+/// ```
 class DefaultFirebaseOptions {
+  /// Retorna configurações específicas para a plataforma atual.
+  /// 
+  /// Suporta: Android e iOS
+  /// Não suporta: Web, Windows, Linux, macOS (lança UnsupportedError)
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
       throw UnsupportedError(
@@ -29,6 +45,14 @@ class DefaultFirebaseOptions {
     }
   }
 
+  /// Configurações Firebase para Android.
+  /// 
+  /// Todas as chaves são lidas do arquivo .env:
+  /// - FIREBASE_ANDROID_API_KEY
+  /// - FIREBASE_ANDROID_APP_ID
+  /// - FIREBASE_ANDROID_MESSAGING_SENDER_ID
+  /// - FIREBASE_ANDROID_PROJECT_ID
+  /// - FIREBASE_ANDROID_STORAGE_BUCKET
   static FirebaseOptions get android => FirebaseOptions(
         apiKey: _envOrThrow('FIREBASE_ANDROID_API_KEY'),
         appId: _envOrThrow('FIREBASE_ANDROID_APP_ID'),
@@ -37,6 +61,15 @@ class DefaultFirebaseOptions {
         storageBucket: _envOrThrow('FIREBASE_ANDROID_STORAGE_BUCKET'),
       );
 
+  /// Configurações Firebase para iOS.
+  /// 
+  /// Todas as chaves são lidas do arquivo .env:
+  /// - FIREBASE_IOS_API_KEY
+  /// - FIREBASE_IOS_APP_ID
+  /// - FIREBASE_IOS_MESSAGING_SENDER_ID
+  /// - FIREBASE_IOS_PROJECT_ID
+  /// - FIREBASE_IOS_STORAGE_BUCKET
+  /// - FIREBASE_IOS_BUNDLE_ID
   static FirebaseOptions get ios => FirebaseOptions(
         apiKey: _envOrThrow('FIREBASE_IOS_API_KEY'),
         appId: _envOrThrow('FIREBASE_IOS_APP_ID'),
@@ -46,6 +79,18 @@ class DefaultFirebaseOptions {
         iosBundleId: _envOrThrow('FIREBASE_IOS_BUNDLE_ID'),
       );
 
+  /// Obtém variável de ambiente ou lança erro se não encontrada.
+  /// 
+  /// Garante que todas as configurações obrigatórias estejam presentes.
+  /// Se alguma variável estiver faltando ou vazia, a aplicação falha
+  /// imediatamente na inicialização com mensagem de erro clara.
+  /// 
+  /// Parâmetro:
+  /// - key: Nome da variável de ambiente no arquivo .env
+  /// 
+  /// Returns: Valor da variável de ambiente
+  /// 
+  /// Throws: StateError se variável não existe ou está vazia
   static String _envOrThrow(String key) {
     final value = dotenv.env[key];
     if (value == null || value.isEmpty) {

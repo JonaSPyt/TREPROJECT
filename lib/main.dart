@@ -10,34 +10,62 @@ import 'package:file_picker/file_picker.dart';
 import 'services/csv_import_service.dart';
 import 'theme/app_theme.dart';
 
+/// Função principal de entrada do aplicativo.
+/// 
+/// Fluxo de inicialização:
+/// 1. Inicializa binding do Flutter
+/// 2. Carrega variáveis de ambiente (.env)
+/// 3. Inicializa Firebase
+/// 4. Cria e configura BarcodeManager
+/// 5. Carrega dados locais (JSON)
+/// 6. Configura SyncService
+/// 7. Carrega dados do Firestore
+/// 8. Inicia listener de sincronização em tempo real
+/// 9. Executa o app
 void main() async {
+  // Necessário para usar métodos assíncronos antes de runApp
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Carrega variáveis de ambiente do arquivo .env
+  // Contém credenciais Firebase e outras configurações sensíveis
   await dotenv.load(fileName: ".env");
 
+  // Inicializa Firebase com configurações específicas da plataforma
+  // (Android/iOS) lidas do arquivo firebase_options.dart
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  // Cria gerenciador central de estado
   final manager = BarcodeManager();
+  
+  // Carrega dados persistidos localmente (códigos, detalhes, fotos)
   await manager.loadFromStorage();
 
+  // ID do projeto no Firestore (compartilhado entre dispositivos)
   const projectId = 'patrimonio-projeto-compartilhado';
 
+  // Cria serviço de sincronização bidirecional com Firebase
   final syncService = SyncService(
     barcodeManager: manager,
     projectId: projectId,
   );
 
+  // Vincula serviço de sync ao manager para permitir uploads automáticos
   manager.setSyncService(syncService);
 
-  // CORREÇÃO: Carrega TANTO items quanto details do Firestore
+  // === CARREGAMENTO INICIAL DO FIRESTORE ===
+  // Carrega dados da nuvem antes de iniciar o app para garantir
+  // que o usuário veja informações atualizadas desde o início
   print('🔥 Iniciando carregamento do Firestore...');
-  await syncService.loadItems(); // ← NOVO: Carrega códigos escaneados
-  await syncService.loadDetails(); // ← Carrega detalhes do CSV
+  await syncService.loadItems();     // Carrega códigos escaneados
+  await syncService.loadDetails();   // Carrega detalhes importados via CSV
   print('✅ Carregamento inicial concluído!');
 
+  // Inicia aplicação
   runApp(MyApp(barcodeManager: manager, syncService: syncService));
 }
 
+/// Widget raiz do aplicativo.
+/// Gerencia tema e navegação principal.
 class MyApp extends StatefulWidget {
   final BarcodeManager barcodeManager;
   final SyncService syncService;
@@ -56,7 +84,10 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // Inicia sincronização em tempo real
+    
+    // Inicia listener de sincronização em tempo real
+    // Detecta mudanças no Firestore e atualiza dados locais automaticamente
+    // O listen vazio é intencional - as atualizações são tratadas dentro do stream
     widget.syncService.listenToChanges().listen((_) {});
   }
 
@@ -64,15 +95,20 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: false,  // Remove banner de debug
+      
+      // Temas personalizados (claro e escuro)
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.system,  // Segue configuração do sistema
+      
       home: HomeScreen(barcodeManager: widget.barcodeManager),
     );
   }
 }
 
+/// Tela inicial do aplicativo com navegação principal.
+/// Fornece acesso ao scanner e à lista de códigos.
 class HomeScreen extends StatelessWidget {
   final BarcodeManager barcodeManager;
 

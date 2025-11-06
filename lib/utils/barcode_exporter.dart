@@ -4,13 +4,41 @@ import 'package:share_plus/share_plus.dart';
 import 'package:archive/archive_io.dart';
 import 'barcode_manager.dart';
 
+/// Classe utilitária para exportação de códigos de barras e fotos.
+/// Gera arquivo ZIP contendo lista formatada e todas as fotos vinculadas.
 class BarcodeExporter {
-  /// Exporta uma pasta compactada (.zip) contendo:
-  /// - Um arquivo TXT com a listagem atual (como já é hoje)
-  /// - Todas as fotos anexadas, com o nome do arquivo sendo o código do patrimônio
-  ///
-  /// Observação: Por limitação de compartilhamento em Android/iOS, é gerado
-  /// um arquivo .zip com a pasta e seus conteúdos para facilitar o envio.
+  /// Exporta códigos e fotos em formato ZIP para compartilhamento.
+  /// 
+  /// Estrutura do ZIP gerado:
+  /// ```
+  /// exportacao_<timestamp>.zip/
+  /// ├── codigos_barras.txt      # Lista formatada com status
+  /// ├── 12345678.jpg            # Foto do patrimônio 1
+  /// ├── 87654321.jpg            # Foto do patrimônio 2
+  /// └── ...
+  /// ```
+  /// 
+  /// Formato do arquivo TXT:
+  /// ```
+  /// Lista de Códigos de Barras
+  /// Data: 2025-11-06 14:30:00
+  /// Total: 25 códigos
+  /// ==================================================
+  /// 
+  /// 1. 12345678
+  ///    Status: Encontrado sem nenhuma pendência
+  /// 
+  /// 2. 87654321
+  ///    Status: Bens não encontrados
+  /// ...
+  /// ```
+  /// 
+  /// Parâmetros:
+  /// - barcodes: Lista de códigos a exportar
+  /// - manager: BarcodeManager para acessar fotos vinculadas
+  /// 
+  /// Throws:
+  /// - Exception se lista vazia ou erro durante exportação
   static Future<void> exportBarcodes(
     List<BarcodeItem> barcodes, {
     required BarcodeManager manager,
@@ -20,83 +48,112 @@ class BarcodeExporter {
     }
 
     try {
-      // Criar conteúdo do arquivo TXT
+      // === ETAPA 1: GERAR CONTEÚDO DO ARQUIVO TXT ===
       final StringBuffer content = StringBuffer();
+      
+      // Cabeçalho
       content.writeln('Lista de Códigos de Barras');
       content.writeln('Data: ${DateTime.now().toString().split('.')[0]}');
       content.writeln('Total: ${barcodes.length} códigos\n');
       content.writeln('=' * 50);
       content.writeln();
 
+      // Lista numerada de códigos com status
       for (int i = 0; i < barcodes.length; i++) {
         final item = barcodes[i];
+        // Escreve código e status
         content.writeln('${i + 1}. ${item.code}');
         content.writeln('   Status: ${item.status.label}');
+
+        // Se houver descrição nos detalhes importados via CSV, exporta também
+        final details = manager.getDetails(item.code);
+        if (details != null && details.descricao != null && details.descricao!.trim().isNotEmpty) {
+          content.writeln('   Descrição: ${details.descricao}');
+        }
+
         content.writeln();
       }
 
-      // Obter diretório temporário e criar pasta da exportação
+      // === ETAPA 2: CRIAR DIRETÓRIO TEMPORÁRIO ===
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final exportFolderName = 'exportacao_$timestamp';
       final exportDir = Directory('${tempDir.path}/$exportFolderName');
+      
       if (!await exportDir.exists()) {
         await exportDir.create(recursive: true);
       }
 
-      // 1) Criar o TXT dentro da pasta
+      // === ETAPA 3: SALVAR ARQUIVO TXT ===
       final txtFile = File('${exportDir.path}/codigos_barras.txt');
       await txtFile.writeAsString(content.toString());
 
-      // 2) Copiar todas as fotos anexadas, renomeando para o código
+      // === ETAPA 4: COPIAR FOTOS COM NOME = CÓDIGO ===
       for (final item in barcodes) {
         final originalPath = manager.getPhotoPath(item.code);
+        
+        // Pula se não tem foto vinculada
         if (originalPath == null || originalPath.isEmpty) continue;
+        
         final src = File(originalPath);
-        if (!await src.exists()) continue;
+        if (!await src.exists()) continue;  // Foto deletada manualmente
 
-        // Preservar extensão original se possível
-        final ext = _safeExtension(originalPath);
-        final sanitized = _sanitizeFilename(item.code);
+        // Nome do arquivo = código do patrimônio (sanitizado)
+        final ext = _safeExtension(originalPath);  // Preserva extensão original
+        final sanitized = _sanitizeFilename(item.code);  // Remove caracteres inválidos
         final destPath = '${exportDir.path}/$sanitized$ext';
+        
         await src.copy(destPath);
       }
 
-      // 3) Compactar a pasta para .zip (para ser facilmente compartilhável)
+      // === ETAPA 5: COMPACTAR EM ZIP ===
+      // Necessário porque Android/iOS não permitem compartilhar pastas diretamente
       final zipPath = '${tempDir.path}/$exportFolderName.zip';
       final encoder = ZipFileEncoder();
       encoder.create(zipPath);
       encoder.addDirectory(exportDir, includeDirName: true);
       encoder.close();
 
-      // 4) Compartilhar o .zip
+      // === ETAPA 6: COMPARTILHAR VIA SHARE API ===
       await Share.shareXFiles(
         [XFile(zipPath)],
         subject: 'Exportação de Códigos de Barras',
         text: 'Exportação de ${barcodes.length} códigos com fotos anexas',
       );
+      
     } catch (e) {
       throw Exception('Erro ao exportar: $e');
     }
   }
 
+  /// Remove caracteres inválidos de nomes de arquivo.
+  /// 
+  /// Substitui caracteres proibidos em sistemas de arquivo por underscore.
+  /// Caracteres removidos: \ / : * ? " < > |
+  /// Espaços também são convertidos em underscore.
   static String _sanitizeFilename(String input) {
-    // Remove/replace caracteres inválidos para nome de arquivo
     final sanitized = input
-        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
-        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')  // Remove caracteres inválidos
+        .replaceAll(RegExp(r'\s+'), '_')           // Substitui espaços por _
         .trim();
     return sanitized.isEmpty ? 'sem_nome' : sanitized;
   }
 
+  /// Extrai extensão do arquivo de forma segura.
+  /// 
+  /// Retorna .jpg por padrão se não conseguir determinar a extensão.
+  /// Limita extensão a 8 caracteres para evitar nomes muito longos.
   static String _safeExtension(String path) {
     final name = path.split('/').last;
     final dot = name.lastIndexOf('.');
+    
     if (dot != -1 && dot < name.length - 1) {
       final ext = name.substring(dot);
-      // limitar a extensões comuns
+      // Limitar a extensões comuns (máximo 8 chars)
       if (ext.length <= 8) return ext;
     }
+    
+    // Padrão: assume JPG
     return '.jpg';
   }
 }
