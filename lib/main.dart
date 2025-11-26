@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'firebase_options.dart';
 import 'pages/scanner_screen.dart';
 import 'pages/blank_screen.dart';
 import 'utils/barcode_manager.dart';
-import 'services/sync_service.dart';
+import 'services/api_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'services/csv_import_service.dart';
+import 'services/pdf_import_service.dart';
 import 'theme/app_theme.dart';
 
 /// Função principal de entrada do aplicativo.
@@ -15,86 +14,75 @@ import 'theme/app_theme.dart';
 /// Fluxo de inicialização:
 /// 1. Inicializa binding do Flutter
 /// 2. Carrega variáveis de ambiente (.env)
-/// 3. Inicializa Firebase
-/// 4. Cria e configura BarcodeManager
-/// 5. Carrega dados locais (JSON)
-/// 6. Configura SyncService
-/// 7. Carrega dados do Firestore
-/// 8. Inicia listener de sincronização em tempo real
-/// 9. Executa o app
+/// 3. Cria e configura BarcodeManager
+/// 4. Carrega dados locais (JSON)
+/// 5. Configura ApiService (API interna da empresa)
+/// 6. Verifica conexão com a API
+/// 7. Carrega dados da API interna
+/// 8. Executa o app
 void main() async {
   // Necessário para usar métodos assíncronos antes de runApp
   WidgetsFlutterBinding.ensureInitialized();
 
   // Carrega variáveis de ambiente do arquivo .env
-  // Contém credenciais Firebase e outras configurações sensíveis
+  // Contém URL da API interna
+  print('📋 Carregando variáveis de ambiente...');
   await dotenv.load(fileName: ".env");
-
-  // Inicializa Firebase com configurações específicas da plataforma
-  // (Android/iOS) lidas do arquivo firebase_options.dart
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print('✅ Arquivo .env carregado!');
+  print('🔧 API_BASE_URL: ${dotenv.env['API_BASE_URL'] ?? 'NÃO DEFINIDA'}');
 
   // Cria gerenciador central de estado
   final manager = BarcodeManager();
   
   // Carrega dados persistidos localmente (códigos, detalhes, fotos)
+  print('💾 Carregando dados locais...');
   await manager.loadFromStorage();
+  print('✅ Dados locais carregados!');
 
-  // ID do projeto no Firestore (compartilhado entre dispositivos)
-  const projectId = 'patrimonio-projeto-compartilhado';
+  // Cria serviço de API interna (WiFi da empresa)
+  final apiService = ApiService(barcodeManager: manager);
 
-  // Cria serviço de sincronização bidirecional com Firebase
-  final syncService = SyncService(
-    barcodeManager: manager,
-    projectId: projectId,
-  );
+  // Vincula serviço de API ao manager para permitir sincronização automática
+  manager.setSyncService(apiService);
 
-  // Vincula serviço de sync ao manager para permitir uploads automáticos
-  manager.setSyncService(syncService);
-
-  // === CARREGAMENTO INICIAL DO FIRESTORE ===
-  // Carrega dados da nuvem antes de iniciar o app para garantir
-  // que o usuário veja informações atualizadas desde o início
-  print('🔥 Iniciando carregamento do Firestore...');
-  await syncService.loadItems();     // Carrega códigos escaneados
-  await syncService.loadDetails();   // Carrega detalhes importados via CSV
-  print('✅ Carregamento inicial concluído!');
+  // === VERIFICAÇÃO DE CONECTIVIDADE ===
+  print('🔍 Verificando conexão com API interna...');
+  final isConnected = await apiService.checkConnection();
+  
+  if (isConnected) {
+    // === CARREGAMENTO INICIAL DA API ===
+    print('🌐 Iniciando carregamento da API interna...');
+    await apiService.loadItems();     // Carrega tombamentos
+    await apiService.loadDetails();   // Carrega detalhes dos patrimônios
+    print('✅ Carregamento inicial concluído!');
+  } else {
+    print('⚠️  Não foi possível conectar com a API.');
+    print('⚠️  O app funcionará offline com dados locais.');
+  }
 
   // Inicia aplicação
-  runApp(MyApp(barcodeManager: manager, syncService: syncService));
+  runApp(MyApp(
+    barcodeManager: manager,
+    apiService: apiService,
+  ));
 }
 
 /// Widget raiz do aplicativo.
 /// Gerencia tema e navegação principal.
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   final BarcodeManager barcodeManager;
-  final SyncService syncService;
+  final ApiService apiService;
 
   const MyApp({
     super.key,
     required this.barcodeManager,
-    required this.syncService,
+    required this.apiService,
   });
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  @override
-  void initState() {
-    super.initState();
-    
-    // Inicia listener de sincronização em tempo real
-    // Detecta mudanças no Firestore e atualiza dados locais automaticamente
-    // O listen vazio é intencional - as atualizações são tratadas dentro do stream
-    widget.syncService.listenToChanges().listen((_) {});
-  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Sistema de Inventário',
       debugShowCheckedModeBanner: false,  // Remove banner de debug
       
       // Temas personalizados (claro e escuro)
@@ -102,7 +90,10 @@ class _MyAppState extends State<MyApp> {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,  // Segue configuração do sistema
       
-      home: HomeScreen(barcodeManager: widget.barcodeManager),
+      home: HomeScreen(
+        barcodeManager: barcodeManager,
+        apiService: apiService,
+      ),
     );
   }
 }
@@ -111,13 +102,18 @@ class _MyAppState extends State<MyApp> {
 /// Fornece acesso ao scanner e à lista de códigos.
 class HomeScreen extends StatelessWidget {
   final BarcodeManager barcodeManager;
+  final ApiService apiService;
 
-  const HomeScreen({super.key, required this.barcodeManager});
+  const HomeScreen({
+    super.key, 
+    required this.barcodeManager,
+    required this.apiService,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tela Inicial')),
+      appBar: AppBar(title: const Text('Tela Iniciall')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -127,8 +123,10 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        ScannerScreen(barcodeManager: barcodeManager),
+                    builder: (context) => ScannerScreen(
+                      barcodeManager: barcodeManager,
+                      apiService: apiService,
+                    ),
                   ),
                 );
               },
@@ -146,8 +144,10 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        BlankScreen(barcodeManager: barcodeManager),
+                    builder: (context) => BlankScreen(
+                      barcodeManager: barcodeManager,
+                      apiService: apiService,
+                    ),
                   ),
                 );
               },
@@ -157,7 +157,7 @@ class HomeScreen extends StatelessWidget {
                   vertical: 20,
                 ),
               ),
-              child: const Text('Outra Tela', style: TextStyle(fontSize: 18)),
+              child: const Text('Outra Telaa', style: TextStyle(fontSize: 18)),
             ),
           ],
         ),
@@ -167,7 +167,7 @@ class HomeScreen extends StatelessWidget {
           try {
             final result = await FilePicker.platform.pickFiles(
               type: FileType.custom,
-              allowedExtensions: ['csv'],
+              allowedExtensions: ['csv', 'pdf'],
               withData: true,
             );
 
@@ -179,13 +179,24 @@ class HomeScreen extends StatelessWidget {
             if (bytes == null) {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Erro ao ler arquivo CSV.')),
+                  const SnackBar(content: Text('Erro ao ler arquivo.')),
                 );
               }
               return;
             }
 
-            final parsed = CsvImportService.parseCsvWithDetails(bytes);
+            // Detecta tipo do arquivo e parseia apropriadamente
+            final extension = file.extension?.toLowerCase();
+            late final dynamic parsed;
+            
+            if (extension == 'pdf') {
+              print('📄 Importando PDF...');
+              parsed = await PdfImportService.parsePdfWithDetails(bytes);
+            } else {
+              print('📊 Importando CSV...');
+              parsed = CsvImportService.parseCsvWithDetails(bytes);
+            }
+            
             barcodeManager.mergeDetails(parsed.detailsByCode);
             final items = parsed.items;
 
@@ -193,8 +204,8 @@ class HomeScreen extends StatelessWidget {
 
             if (items.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('CSV não contém patrimônios válidos.'),
+                SnackBar(
+                  content: Text('${extension == 'pdf' ? 'PDF' : 'CSV'} não contém patrimônios válidos.'),
                 ),
               );
               return;
@@ -214,7 +225,7 @@ class HomeScreen extends StatelessWidget {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Importado: $added, Ignorados: $skipped'),
+                  content: Text('${extension == 'pdf' ? 'PDF' : 'CSV'} importado: $added novos, $skipped já existiam'),
                   duration: const Duration(seconds: 3),
                 ),
               );
@@ -222,8 +233,10 @@ class HomeScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                      BlankScreen(barcodeManager: barcodeManager),
+                  builder: (context) => BlankScreen(
+                    barcodeManager: barcodeManager,
+                    apiService: apiService,
+                  ),
                 ),
               );
             }

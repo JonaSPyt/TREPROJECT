@@ -5,13 +5,19 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../widgets/status_selector_dialog.dart';
+import '../services/api_service.dart';
 
 /// Tela de escaneamento de códigos de barras.
 /// Implementa sistema de verificação tripla para garantir leituras intencionais.
 class ScannerScreen extends StatefulWidget {
   final BarcodeManager barcodeManager;
+  final ApiService? apiService;
 
-  const ScannerScreen({super.key, required this.barcodeManager});
+  const ScannerScreen({
+    super.key, 
+    required this.barcodeManager,
+    this.apiService,
+  });
 
   @override
   State<ScannerScreen> createState() => _ScannerScreenState();
@@ -71,13 +77,42 @@ class _ScannerScreenState extends State<ScannerScreen> {
       final File dest = File('${photosDir.path}/$filename');
       await File(picked.path).copy(dest.path);
 
-      // Vincula foto ao código
+      // Salva foto localmente primeiro
       await widget.barcodeManager.setPhotoForCode(code, dest.path);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Foto vinculada com sucesso.')),
-        );
+      // Tenta fazer upload para API se conectado
+      if (widget.apiService != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('📤 Enviando foto para API...')),
+          );
+        }
+        
+        final fotoUrl = await widget.apiService!.uploadPhoto(code, dest.path);
+        
+        if (mounted) {
+          if (fotoUrl != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ Foto vinculada e enviada para API!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('⚠️ Foto salva localmente, mas falhou upload para API'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Foto vinculada localmente')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

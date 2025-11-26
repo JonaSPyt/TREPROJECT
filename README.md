@@ -33,11 +33,13 @@
 O **TreProject** é uma aplicação móvel desenvolvida em Flutter para gerenciamento de inventário patrimonial com as seguintes características principais:
 
 - **Escaneamento Inteligente**: Sistema de verificação tripla com intervalos de 200ms para evitar leituras acidentais
-- **Sincronização em Tempo Real**: Integração com Firebase Firestore para backup e sincronização entre dispositivos
+- **API Interna**: Sincronização com API REST interna da empresa (funciona apenas no WiFi corporativo)
+- **Sincronização Firebase**: Integração com Firebase Firestore para backup e sincronização alternativa
 - **Gestão de Fotos**: Captura e gerenciamento de fotos vinculadas a cada patrimônio
 - **Importação CSV**: Importação em lote de dados patrimoniais
 - **Exportação Completa**: Geração de arquivos ZIP com dados e fotos
-- **Múltiplos Status**: Sistema de categorização com 5 estados diferentes
+- **Múltiplos Status**: Sistema de categorização com 6 estados diferentes
+- **Modo Offline**: Funciona mesmo sem conexão, salvando dados localmente
 - **Segurança**: Credenciais protegidas com variáveis de ambiente
 
 ---
@@ -73,23 +75,36 @@ Cada patrimônio pode ter uma foto vinculada com as seguintes operações:
 - Nomenclatura: `<timestamp>_<codigo>.jpg`
 - Sincronização: Caminho salvo no Firestore
 
-### 🔄 Sincronização em Nuvem
+### 🔄 Sincronização de Dados
+
+**Opções de Sincronização**:
+
+1. **API Interna (Principal)**: 
+   - Funciona apenas no WiFi da empresa
+   - Servidor REST em `http://192.168.201.126:3000`
+   - Sincronização sob demanda (ao escanear, importar, etc.)
+   
+2. **Firebase Firestore (Alternativa)**:
+   - Sincronização em tempo real
+   - Funciona em qualquer rede
+   - Mantido para compatibilidade
 
 **Arquitetura de Sincronização**:
 
 ```
-Local (BarcodeManager) ←→ Firebase Firestore
+Local (BarcodeManager) ←→ API Interna / Firebase Firestore
          ↓                        ↓
-   _barcodes list          items collection
-   _detailsByCode map      details collection
+   _barcodes list          tombamentos / items collection
+   _detailsByCode map      detalhes / details collection
    _photoByCode map        (path references)
 ```
 
 **Estratégia de Sincronização**:
-- **Upward Sync**: Alterações locais → Firebase (automático)
-- **Downward Sync**: Firebase → Local (listener em tempo real)
+- **Upward Sync**: Alterações locais → Servidor (automático)
+- **Downward Sync**: Servidor → Local (na inicialização do app)
 - **Conflict Resolution**: Last-write-wins
 - **Silent Updates**: Evita loops de notificação
+- **Modo Offline**: Dados salvos localmente em JSON
 
 ### 📊 Importação CSV
 
@@ -285,6 +300,7 @@ Gerador de exportações em formato ZIP.
 ```yaml
 firebase_core: ^4.2.0          # Inicialização Firebase
 cloud_firestore: ^6.0.3        # Banco de dados NoSQL
+http: ^1.1.0                   # Cliente HTTP para API interna
 ```
 
 #### Escaneamento
@@ -343,7 +359,8 @@ TREPROJECT/
 │   │   └── status_selector_dialog.dart # Dialog de seleção de status
 │   │
 │   ├── services/                    # Camada de serviços
-│   │   ├── sync_service.dart        # Sincronização Firebase
+│   │   ├── api_service.dart         # API REST interna (principal)
+│   │   ├── sync_service.dart        # Sincronização Firebase (alternativa)
 │   │   └── csv_import_service.dart  # Importação CSV
 │   │
 │   ├── utils/                       # Utilitários
@@ -363,10 +380,15 @@ TREPROJECT/
 │   └── Runner/
 │       └── Info.plist               # Permissões iOS
 │
+├── server.js                        # Servidor Node.js (API interna)
+├── package.json                     # Dependências Node.js
+├── data.json                        # Dados persistidos da API (gerado automaticamente)
 ├── .env                             # Variáveis de ambiente (gitignored)
 ├── .env.example                     # Template de variáveis
 ├── .gitignore                       # Arquivos ignorados pelo Git
 ├── pubspec.yaml                     # Dependências Flutter
+├── API_DOCUMENTATION.md             # Documentação completa da API
+├── SERVER_README.md                 # Guia do servidor Node.js
 └── README.md                        # Esta documentação
 ```
 
@@ -394,19 +416,25 @@ git clone https://github.com/JonaSPyt/TREPROJECT.git
 cd TREPROJECT
 ```
 
-#### 2. Configure Variáveis de Ambiente
+#### 2. Configure a API Interna
 
-Crie arquivo `.env` na raiz do projeto:
+##### Opção A: Usar Servidor Existente
+
+Se você já tem uma API rodando em `http://192.168.201.126:3000`:
+
+Crie arquivo `.env` na raiz do projeto com a URL da API:
 
 ```env
-# Firebase Android
+# API Interna (WiFi da empresa)
+API_BASE_URL=http://192.168.201.126:3000
+
+# Firebase (opcional, para backup)
 FIREBASE_ANDROID_API_KEY=sua_chave_aqui
 FIREBASE_ANDROID_APP_ID=seu_app_id_aqui
 FIREBASE_ANDROID_MESSAGING_SENDER_ID=seu_sender_id_aqui
 FIREBASE_ANDROID_PROJECT_ID=seu_project_id_aqui
 FIREBASE_ANDROID_STORAGE_BUCKET=seu_bucket_aqui
 
-# Firebase iOS
 FIREBASE_IOS_API_KEY=sua_chave_aqui
 FIREBASE_IOS_APP_ID=seu_app_id_aqui
 FIREBASE_IOS_MESSAGING_SENDER_ID=seu_sender_id_aqui
@@ -415,7 +443,27 @@ FIREBASE_IOS_STORAGE_BUCKET=seu_bucket_aqui
 FIREBASE_IOS_BUNDLE_ID=com.example.treproject
 ```
 
-**⚠️ IMPORTANTE**: Nunca commite o arquivo `.env` no Git!
+##### Opção B: Configurar Servidor Node.js Incluído
+
+O projeto inclui um servidor Node.js pronto para uso:
+
+```bash
+# Instalar dependências do servidor
+npm install
+
+# Editar server.js e configurar seu IP
+# const HOST = '192.168.201.126'; // Altere para seu IP
+
+# Iniciar servidor
+npm start
+```
+
+Veja `SERVER_README.md` e `API_DOCUMENTATION.md` para mais detalhes.
+
+**⚠️ IMPORTANTE**: 
+- Nunca commite o arquivo `.env` no Git!
+- A API funciona apenas no WiFi da empresa
+- O app funciona offline se não conseguir conectar
 
 #### 3. Instale Dependências
 

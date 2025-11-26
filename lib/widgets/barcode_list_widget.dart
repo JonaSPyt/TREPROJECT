@@ -52,6 +52,59 @@ class BarcodeListWidget extends StatelessWidget {
     );
   }
 
+  Widget _buildLeadingWidget(int index, BarcodeItem item, String? photoPath) {
+    // Se não tem foto, mostra círculo com número
+    if (photoPath == null || photoPath.isEmpty) {
+      return CircleAvatar(
+        backgroundColor: item.status.color,
+        child: Text('${index + 1}'),
+      );
+    }
+
+    // Debug: mostra o path recebido
+    print('🖼️  Item ${item.code}: photoPath = "$photoPath"');
+
+    // Se tem foto, decide qual ImageProvider usar
+    ImageProvider imageProvider;
+    if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) {
+      print('   → Usando NetworkImage');
+      imageProvider = NetworkImage(photoPath);
+    } else {
+      print('   → Usando FileImage');
+      imageProvider = FileImage(File(photoPath));
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image(
+        image: imageProvider,
+        width: 48,
+        height: 48,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('❌ Erro ao carregar imagem: $photoPath');
+          print('   Erro: $error');
+          return const Icon(Icons.broken_image, size: 48, color: Colors.red);
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return SizedBox(
+            width: 48,
+            height: 48,
+            child: Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                    : null,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
@@ -63,20 +116,7 @@ class BarcodeListWidget extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           color: item.status.color.withOpacity(0.1),
           child: ListTile(
-            leading: photoPath != null && photoPath.isNotEmpty
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image(
-                      image: FileImage(File(photoPath)),
-                      width: 48,
-                      height: 48,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                : CircleAvatar(
-                    backgroundColor: item.status.color,
-                    child: Text('${index + 1}'),
-                  ),
+            leading: _buildLeadingWidget(index, item, photoPath),
             title: Text(item.code),
             onTap: onTapItem == null ? null : () => onTapItem!(item),
             subtitle: item.status != BarcodeStatus.none

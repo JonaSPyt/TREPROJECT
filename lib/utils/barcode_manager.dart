@@ -81,19 +81,27 @@ class BarcodeManager extends ChangeNotifier {
   /// Vincula uma foto a um código específico.
   /// Salva no mapa interno, notifica listeners e persiste no storage.
   Future<void> setPhotoForCode(String code, String path) async {
+    if (path.isEmpty) {
+      print('⚠️  Tentando salvar path vazio para código $code');
+      return;
+    }
+    print('💾 Salvando foto: $code -> $path');
     _photoByCode[code] = path;
     notifyListeners();  // Atualiza a UI
     await _savePhotosToStorage();  // Persiste no arquivo JSON
   }
 
   /// Remove a foto associada a um código.
-  /// Remove do mapa, deleta o arquivo físico e persiste as mudanças.
+  /// Remove do mapa, deleta o arquivo físico (se não for URL) e persiste as mudanças.
   Future<void> removePhotoForCode(String code) async {
     final path = _photoByCode.remove(code);
     if (path != null) {
-      final file = File(path);
-      if (await file.exists()) {
-        await file.delete();  // Deleta arquivo físico
+      // Só tenta deletar arquivo se não for uma URL HTTP
+      if (!path.startsWith('http://') && !path.startsWith('https://')) {
+        final file = File(path);
+        if (await file.exists()) {
+          await file.delete();  // Deleta arquivo físico local
+        }
       }
     }
     notifyListeners();
@@ -175,7 +183,7 @@ class BarcodeManager extends ChangeNotifier {
 
   /// Remove um código da lista.
   /// Remove tanto o código quanto seus detalhes associados.
-  /// Notifica listeners, persiste e sincroniza remoção com Firebase.
+  /// Notifica listeners, persiste e sincroniza remoção com a API.
   void removeBarcode(String barcode) {
     _barcodes.removeWhere((item) => item.code == barcode);
     _detailsByCode.remove(barcode);
@@ -183,7 +191,7 @@ class BarcodeManager extends ChangeNotifier {
     Future.microtask(() => _saveToStorage());
     Future.microtask(() => _saveDetailsToStorage());
 
-    // Sincroniza remoção com Firestore
+    // Sincroniza remoção com a API
     if (_syncService != null) {
       Future.microtask(() => _syncService.removeItem(barcode));
     }
@@ -302,8 +310,12 @@ class BarcodeManager extends ChangeNotifier {
         final Map<String, dynamic> map = jsonDecode(content);
         _photoByCode.clear();
         map.forEach((k, v) {
-          if (v is String) _photoByCode[k] = v;  // Validação de tipo
+          if (v is String && v.isNotEmpty) {
+            _photoByCode[k] = v;  // Validação de tipo e não vazio
+            print('📂 Carregada foto: $k -> $v');
+          }
         });
+        print('✅ Total de fotos carregadas: ${_photoByCode.length}');
       }
     } catch (e) {
       print('Erro ao carregar fotos: $e');

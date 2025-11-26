@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../utils/barcode_manager.dart';
+import '../services/api_service.dart';
 import 'scanner_screen.dart';
 import '../utils/barcode_exporter.dart';
 import '../widgets/barcode_list_widget.dart';
@@ -11,18 +12,33 @@ import 'package:path_provider/path_provider.dart';
 
 class BlankScreen extends StatefulWidget {
   final BarcodeManager barcodeManager;
+  final ApiService? apiService;
 
-  const BlankScreen({super.key, required this.barcodeManager});
+  const BlankScreen({
+    super.key, 
+    required this.barcodeManager,
+    this.apiService,
+  });
 
   @override
   State<BlankScreen> createState() => _BlankScreenState();
 }
 
 class _BlankScreenState extends State<BlankScreen> {
+  bool _isInitialLoading = true;
+
   @override
   void initState() {
     super.initState();
     widget.barcodeManager.addListener(_onBarcodeListChanged);
+    // Aguarda um frame para marcar como carregado
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _isInitialLoading = false;
+        });
+      }
+    });
   }
 
   @override
@@ -33,6 +49,33 @@ class _BlankScreenState extends State<BlankScreen> {
 
   void _onBarcodeListChanged() {
     setState(() {});
+  }
+
+  /// Atualiza os dados da API
+  Future<void> _refreshData() async {
+    if (widget.apiService != null) {
+      print('🔄 Atualizando dados da API...');
+      try {
+        await widget.apiService!.loadItems();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Dados atualizados!'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Erro ao atualizar: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Future<String?> _pickAndLinkPhoto(String code, ImageSource source) async {
@@ -55,12 +98,42 @@ class _BlankScreenState extends State<BlankScreen> {
       final File dest = File('${photosDir.path}/$filename');
       await File(picked.path).copy(dest.path);
 
+      // Salva foto localmente primeiro
       await widget.barcodeManager.setPhotoForCode(code, dest.path);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Foto vinculada com sucesso.')),
-        );
+      // Tenta fazer upload para API se conectado
+      if (widget.apiService != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('📤 Enviando foto para API...')),
+          );
+        }
+        
+        final fotoUrl = await widget.apiService!.uploadPhoto(code, dest.path);
+        
+        if (mounted) {
+          if (fotoUrl != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ Foto vinculada e enviada para API!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('⚠️ Foto salva localmente, mas falhou upload para API'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Foto vinculada localmente')),
+          );
+        }
       }
 
       return dest.path;
@@ -158,23 +231,45 @@ class _BlankScreenState extends State<BlankScreen> {
             ),
         ],
       ),
-      body: barcodes.isEmpty
+      body: _isInitialLoading
           ? const Center(
-              child: Text(
-                'Nenhum código escaneado ainda',
-                style: TextStyle(fontSize: 16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Carregando dados...'),
+                ],
               ),
             )
-          : BarcodeListWidget(
-              barcodes: barcodes,
-              onDelete: (barcode) {
-                widget.barcodeManager.removeBarcode(barcode);
-              },
-              onStatusChange: (barcode, status) {
-                widget.barcodeManager.updateBarcodeStatus(barcode, status);
-              },
-              getPhotoPath: widget.barcodeManager.getPhotoPath,
-              onTapItem: (item) {
+          : barcodes.isEmpty
+              ? RefreshIndicator(
+                  onRefresh: _refreshData,
+                  child: ListView(
+                    children: const [
+                      SizedBox(height: 200),
+                      Center(
+                        child: Text(
+                          'Nenhum código escaneado ainda\n\nPuxe para baixo para atualizar',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+              onRefresh: _refreshData,
+              child: BarcodeListWidget(
+                barcodes: barcodes,
+                onDelete: (barcode) {
+                  widget.barcodeManager.removeBarcode(barcode);
+                },
+                onStatusChange: (barcode, status) {
+                  widget.barcodeManager.updateBarcodeStatus(barcode, status);
+                },
+                getPhotoPath: widget.barcodeManager.getPhotoPath,
+                onTapItem: (item) {
                 showModalBottomSheet(
                   context: context,
                   isScrollControlled: true,
@@ -223,12 +318,38 @@ class _BlankScreenState extends State<BlankScreen> {
                                   currentPhotoPath.isNotEmpty) ...[
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                  child: Image.file(
-                                    File(currentPhotoPath),
-                                    width: double.infinity,
-                                    height: 180,
-                                    fit: BoxFit.cover,
-                                  ),
+                                  child: currentPhotoPath.startsWith('http')
+                                      ? Image.network(
+                                          currentPhotoPath,
+                                          width: double.infinity,
+                                          height: 180,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              width: double.infinity,
+                                              height: 180,
+                                              color: Colors.grey[300],
+                                              child: const Icon(Icons.broken_image, size: 64),
+                                            );
+                                          },
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null) return child;
+                                            return Container(
+                                              width: double.infinity,
+                                              height: 180,
+                                              color: Colors.grey[200],
+                                              child: const Center(
+                                                child: CircularProgressIndicator(),
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      : Image.file(
+                                          File(currentPhotoPath),
+                                          width: double.infinity,
+                                          height: 180,
+                                          fit: BoxFit.cover,
+                                        ),
                                 ),
                                 const SizedBox(height: 8),
                                 Wrap(
@@ -242,9 +363,9 @@ class _BlankScreenState extends State<BlankScreen> {
                                           builder: (context) => Dialog(
                                             clipBehavior: Clip.antiAlias,
                                             child: InteractiveViewer(
-                                              child: Image.file(
-                                                File(currentPhotoPath),
-                                              ),
+                                              child: currentPhotoPath.startsWith('http')
+                                                  ? Image.network(currentPhotoPath)
+                                                  : Image.file(File(currentPhotoPath)),
                                             ),
                                           ),
                                         );
@@ -287,16 +408,28 @@ class _BlankScreenState extends State<BlankScreen> {
                                     ),
                                     OutlinedButton.icon(
                                       onPressed: () async {
-                                        await widget.barcodeManager
-                                            .removePhotoForCode(item.code);
+                                        // Tenta remover da API primeiro
+                                        bool success = false;
+                                        if (widget.apiService != null) {
+                                          success = await widget.apiService!.removePhoto(item.code);
+                                        } else {
+                                          // Se não tem API, remove só localmente
+                                          await widget.barcodeManager
+                                              .removePhotoForCode(item.code);
+                                          success = true;
+                                        }
+                                        
                                         setModalState(() {});
                                         if (mounted) {
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
-                                            const SnackBar(
+                                            SnackBar(
                                               content: Text(
-                                                'Foto removida do patrimônio.',
+                                                success 
+                                                  ? '✅ Foto removida com sucesso!'
+                                                  : '❌ Erro ao remover foto da API',
                                               ),
+                                              backgroundColor: success ? Colors.green : Colors.red,
                                             ),
                                           );
                                         }
@@ -384,6 +517,7 @@ class _BlankScreenState extends State<BlankScreen> {
                 );
               },
             ),
+          ),
     );
   }
 }
