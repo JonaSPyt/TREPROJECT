@@ -2,7 +2,7 @@
     <!-- Permission to use the device camera for barcode scanning -->
     <uses-permission android:name="android.permission.CAMERA" />
     <application
-        android:label="treproject"
+        android:label="PatriTRE"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -83,7 +83,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sistema de Inventário',
+      title: 'PatriTRE',
       debugShowCheckedModeBanner: false,  // Remove banner de debug
       
       // Temas personalizados (claro e escuro)
@@ -377,7 +377,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 24),
                       // Título
                       const Text(
-                        'Sistema de\nInventário',
+                        'PatriTRE',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 32,
@@ -387,7 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Gerencie seus patrimônios de forma simples',
+                        'Sistema de Inventário Patrimonial',
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.8),
                           fontSize: 14,

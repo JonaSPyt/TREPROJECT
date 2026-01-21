@@ -5,7 +5,7 @@ const path = require('path');
 
 const app = express();
 const PORT = 3000;
-const HOST = '192.168.201.126'; // Altere para o IP do seu servidor na rede da empresa
+const HOST = '0.0.0.0'; // Aceita conexões de qualquer IP/rede (WiFi e cabo)
 
 // Middleware
 app.use(cors()); // Permite requisições do app Flutter
@@ -266,7 +266,8 @@ app.listen(PORT, HOST, () => {
   console.log('╔════════════════════════════════════════════════════╗');
   console.log('║  🚀 API de Tombamentos rodando!                    ║');
   console.log('╠════════════════════════════════════════════════════╣');
-  console.log(`║  📍 URL: http://${HOST}:${PORT}             ║`);
+  console.log(`║  📍 Host: ${HOST}:${PORT} (todas as interfaces)     ║`);
+  console.log(`║  🌐 Acesse via: http://10.7.100.114:${PORT}          ║`);
   console.log(`║  📦 Tombamentos: ${data.tombamentos.length.toString().padEnd(31)}║`);
   console.log(`║  📋 Detalhes: ${data.detalhes.length.toString().padEnd(34)}║`);
   console.log('╠════════════════════════════════════════════════════╣');
