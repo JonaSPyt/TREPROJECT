@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
-import '../utils/barcode_manager.dart';
+import '../utils/patrimonio_manager.dart';
 
 class CsvImportService {
   /// Resultado do parsing contendo itens e metadados por código.

@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../utils/barcode_manager.dart';
+import '../utils/patrimonio_manager.dart';
 import '../services/api_service.dart';
-import 'scanner_screen.dart';
-import '../utils/barcode_exporter.dart';
-import '../widgets/barcode_list_widget.dart';
+import 'barcode_scanner_screen.dart';
+import '../utils/patrimonio_exporter.dart';
+import '../widgets/patrimonio_list_widget.dart';
 import 'dart:io';
 import 'package:share_plus/share_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import '../theme/app_colors.dart';
 
 class BlankScreen extends StatefulWidget {
   final BarcodeManager barcodeManager;
@@ -192,7 +193,10 @@ class _BlankScreenState extends State<BlankScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
-                      ScannerScreen(barcodeManager: widget.barcodeManager),
+                      ScannerScreen(
+                        barcodeManager: widget.barcodeManager,
+                        apiService: widget.apiService,
+                      ),
                 ),
               );
             },
@@ -246,13 +250,50 @@ class _BlankScreenState extends State<BlankScreen> {
               ? RefreshIndicator(
                   onRefresh: _refreshData,
                   child: ListView(
-                    children: const [
-                      SizedBox(height: 200),
+                    children: [
+                      const SizedBox(height: 100),
                       Center(
-                        child: Text(
-                          'Nenhum código escaneado ainda\n\nPuxe para baixo para atualizar',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 16),
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.inventory_2_outlined,
+                                size: 64,
+                                color: AppColors.primary.withOpacity(0.5),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            const Text(
+                              'Nenhum patrimônio',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Escaneie códigos de barras ou\nimporte um arquivo CSV/PDF',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              '↓ Puxe para atualizar',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textLight,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

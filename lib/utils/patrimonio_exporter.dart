@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:archive/archive_io.dart';
-import 'barcode_manager.dart';
+import 'patrimonio_manager.dart';
 
 /// Classe utilitária para exportação de códigos de barras e fotos.
 /// Gera arquivo ZIP contendo lista formatada e todas as fotos vinculadas.

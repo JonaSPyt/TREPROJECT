@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' as http_parser;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import '../utils/barcode_manager.dart';
+import '../utils/patrimonio_manager.dart';
 
 /// Serviço responsável pela comunicação com a API interna da empresa.
 /// Gerencia todas as operações de sincronização de dados via HTTP.
@@ -419,14 +419,60 @@ class ApiService {
       print('   Arquivo: $filePath');
       
       // Primeiro, busca o ID e dados do tombamento
-      final getResponse = await http.get(
+      var getResponse = await http.get(
         Uri.parse('$baseUrl/tombamentos/codigo/$code'),
         headers: _headers,
       ).timeout(const Duration(seconds: 10));
 
+      // Se tombamento não existe, cria primeiro
       if (getResponse.statusCode != 200) {
-        print('❌ Tombamento não encontrado: $code');
-        return null;
+        print('⚠️  Tombamento não encontrado, criando primeiro: $code');
+        
+        // Busca detalhes locais se existirem
+        final details = barcodeManager.getDetails(code);
+        final barcodeItem = barcodeManager.barcodes.where((b) => b.code == code).firstOrNull;
+        
+        final createBody = json.encode({
+          'codigo': code,
+          'descricao': details?.descricao ?? 'Patrimônio $code',
+          'localizacao': details?.localizacao,
+          'oldcode': details?.oldCode,
+          'valor': details?.valorAquisicao,
+          'status': barcodeItem?.status.index ?? 1,
+        });
+        
+        print('   Criando tombamento: $createBody');
+        
+        final createResponse = await http.post(
+          Uri.parse('$baseUrl/tombamentos'),
+          headers: _headers,
+          body: createBody,
+        ).timeout(const Duration(seconds: 10));
+        
+        if (createResponse.statusCode == 200 || createResponse.statusCode == 201) {
+          print('✅ Tombamento criado com sucesso!');
+          // Busca novamente para pegar o ID
+          getResponse = await http.get(
+            Uri.parse('$baseUrl/tombamentos/codigo/$code'),
+            headers: _headers,
+          ).timeout(const Duration(seconds: 10));
+        } else if (createResponse.statusCode == 409) {
+          // Conflito - já existe, tenta buscar novamente
+          print('⚠️  Tombamento já existe (409), buscando...');
+          getResponse = await http.get(
+            Uri.parse('$baseUrl/tombamentos/codigo/$code'),
+            headers: _headers,
+          ).timeout(const Duration(seconds: 10));
+        } else {
+          print('❌ Erro ao criar tombamento: ${createResponse.statusCode}');
+          print('   Body: ${createResponse.body}');
+          return null;
+        }
+        
+        if (getResponse.statusCode != 200) {
+          print('❌ Tombamento não encontrado após criação: $code');
+          return null;
+        }
       }
 
       final tombamento = json.decode(utf8.decode(getResponse.bodyBytes));
@@ -588,6 +634,8 @@ class ApiService {
 
       if (getResponse.statusCode != 200) {
         print('❌ Tombamento não encontrado: $code');
+        // Mesmo assim, remove foto local se existir
+        await barcodeManager.removePhotoForCode(code);
         return false;
       }
 
@@ -595,18 +643,29 @@ class ApiService {
       final id = data['id'];
       final foto = data['foto'];
       
-      if (foto == null || foto == '') {
-        print('⚠️  Tombamento não possui foto');
-        return false;
+      print('📝 Dados do tombamento: id=$id, foto=$foto (tipo: ${foto.runtimeType})');
+      
+      // Verifica se tem foto na API
+      final temFotoNaApi = foto != null && foto.toString().trim().isNotEmpty;
+      
+      if (!temFotoNaApi) {
+        print('⚠️  Tombamento não possui foto na API, removendo apenas localmente...');
+        // Remove foto local mesmo se não existe na API
+        await barcodeManager.removePhotoForCode(code);
+        return true; // Retorna true porque a operação local foi feita
       }
       
       print('📝 ID encontrado: $id, removendo foto da API...');
+      print('   URL: $baseUrl/tombamentos/$id/foto');
       
       // Remove foto via API
       final response = await http.delete(
         Uri.parse('$baseUrl/tombamentos/$id/foto'),
         headers: _headers,
       ).timeout(const Duration(seconds: 10));
+      
+      print('   Status: ${response.statusCode}');
+      print('   Body: ${response.body}');
       
       if (response.statusCode == 200 || response.statusCode == 204) {
         print('✅ Foto removida da API com sucesso!');
@@ -616,13 +675,16 @@ class ApiService {
         
         return true;
       } else {
-        print('❌ Erro ao remover foto: ${response.statusCode}');
-        print('   Resposta: ${response.body}');
+        print('❌ Erro ao remover foto da API: ${response.statusCode}');
+        // Mesmo com erro na API, remove localmente
+        await barcodeManager.removePhotoForCode(code);
         return false;
       }
     } catch (e) {
       print('❌ Erro ao remover foto: $e');
       print('⚠️  Verifique se está conectado no WiFi da empresa');
+      // Em caso de erro, tenta remover localmente
+      await barcodeManager.removePhotoForCode(code);
       return false;
     }
   }

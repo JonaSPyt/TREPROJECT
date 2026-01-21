@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
-import '../utils/barcode_manager.dart';
+import '../utils/patrimonio_manager.dart';
 
 /// Serviço para importação de dados a partir de arquivos PDF.
 /// Extrai informações de patrimônio (tombamento) de relatórios em PDF.

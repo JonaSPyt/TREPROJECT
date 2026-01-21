@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../utils/barcode_manager.dart';
+import '../utils/patrimonio_manager.dart';
 
 /// Exibe um dialog modal para seleção de status de patrimônio.
 /// 
