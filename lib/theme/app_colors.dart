@@ -17,14 +17,16 @@ class AppColors {
   static const Color info = Color(0xFF06B6D4); // Cyan 500
 
   // Surfaces
-  static const Color background = Color(0xFFF8FAFC); // Slate 50
-  static const Color surface = Colors.white;
-  static const Color surfaceVariant = Color(0xFFF1F5F9); // Slate 100
+  static const Color background = Color(0xFF121212); // Dark background
+  static const Color backgroundLight = Color(0xFFF8FAFC); // Slate 50 (para modo claro se necessário)
+  static const Color surface = Color(0xFF1E1E1E); // Dark surface
+  static const Color surfaceLight = Colors.white;
+  static const Color surfaceVariant = Color(0xFF2D2D2D); // Dark variant
   
-  // Text
-  static const Color textPrimary = Color(0xFF1E293B); // Slate 800
-  static const Color textSecondary = Color(0xFF64748B); // Slate 500
-  static const Color textLight = Color(0xFF94A3B8); // Slate 400
+  // Text - Ajustado para fundo escuro
+  static const Color textPrimary = Color(0xFFFFFFFF); // White
+  static const Color textSecondary = Color(0xFFB0B0B0); // Light gray
+  static const Color textLight = Color(0xFF808080); // Gray
   
   // Gradients
   static const LinearGradient primaryGradient = LinearGradient(

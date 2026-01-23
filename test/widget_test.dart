@@ -8,7 +8,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:treproject/main.dart';
-import 'package:treproject/utils/barcode_manager.dart';
+import 'package:treproject/utils/patrimonio_manager.dart';
 import 'package:treproject/services/api_service.dart';
 
 void main() {

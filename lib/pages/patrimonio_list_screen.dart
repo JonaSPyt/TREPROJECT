@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../utils/patrimonio_manager.dart';
 import '../services/api_service.dart';
+import '../services/departamento_service.dart';
+import '../models/departamento.dart';
 import 'barcode_scanner_screen.dart';
 import '../utils/patrimonio_exporter.dart';
 import '../widgets/patrimonio_list_widget.dart';
@@ -27,6 +29,8 @@ class BlankScreen extends StatefulWidget {
 
 class _BlankScreenState extends State<BlankScreen> {
   bool _isInitialLoading = true;
+  final DepartamentoService _deptService = DepartamentoService();
+  Map<String, Departamento?> _departamentosPorCodigo = {};
 
   @override
   void initState() {
@@ -38,6 +42,7 @@ class _BlankScreenState extends State<BlankScreen> {
         setState(() {
           _isInitialLoading = false;
         });
+        _carregarDepartamentos();
       }
     });
   }
@@ -48,8 +53,31 @@ class _BlankScreenState extends State<BlankScreen> {
     super.dispose();
   }
 
+  /// Carrega os departamentos para todos os códigos na lista
+  Future<void> _carregarDepartamentos() async {
+    try {
+      final codigos = widget.barcodeManager.barcodes.map((b) => b.code).toList();
+      if (codigos.isEmpty) return;
+      
+      final result = await _deptService.buscarDepartamentosEmLote(codigos);
+      if (mounted) {
+        setState(() {
+          _departamentosPorCodigo = result;
+        });
+      }
+    } catch (e) {
+      print('⚠️ Erro ao carregar departamentos: $e');
+    }
+  }
+
+  /// Retorna o nome do departamento para um código
+  String? _getDepartamentoNome(String codigo) {
+    final dept = _departamentosPorCodigo[codigo];
+    return dept?.nome;
+  }
   void _onBarcodeListChanged() {
     setState(() {});
+    _carregarDepartamentos(); // Recarrega departamentos quando a lista muda
   }
 
   /// Atualiza os dados da API
@@ -58,6 +86,7 @@ class _BlankScreenState extends State<BlankScreen> {
       print('🔄 Atualizando dados da API...');
       try {
         await widget.apiService!.loadItems();
+        await _carregarDepartamentos(); // Recarrega departamentos
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -183,7 +212,7 @@ class _BlankScreenState extends State<BlankScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Lista de Códigos'),
+        title: const Text('Tombamentos'),
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_scanner),
@@ -310,6 +339,7 @@ class _BlankScreenState extends State<BlankScreen> {
                   widget.barcodeManager.updateBarcodeStatus(barcode, status);
                 },
                 getPhotoPath: widget.barcodeManager.getPhotoPath,
+                getDepartamento: _getDepartamentoNome,
                 onTapItem: (item) {
                 showModalBottomSheet(
                   context: context,
@@ -369,8 +399,8 @@ class _BlankScreenState extends State<BlankScreen> {
                                             return Container(
                                               width: double.infinity,
                                               height: 180,
-                                              color: Colors.grey[300],
-                                              child: const Icon(Icons.broken_image, size: 64),
+                                              color: AppColors.surfaceVariant,
+                                              child: Icon(Icons.broken_image, size: 64, color: AppColors.textLight),
                                             );
                                           },
                                           loadingBuilder: (context, child, loadingProgress) {
@@ -378,7 +408,7 @@ class _BlankScreenState extends State<BlankScreen> {
                                             return Container(
                                               width: double.infinity,
                                               height: 180,
-                                              color: Colors.grey[200],
+                                              color: AppColors.surfaceVariant,
                                               child: const Center(
                                                 child: CircularProgressIndicator(),
                                               ),

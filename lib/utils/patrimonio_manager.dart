@@ -134,9 +134,44 @@ class BarcodeManager extends ChangeNotifier {
     return _barcodes.any((item) => item.code == code);
   }
 
+  /// Busca um código cadastrado que seja sufixo do código escaneado.
+  /// Exemplo: escaneado "87043854" encontra cadastrado "43854"
+  /// Retorna o código cadastrado encontrado ou null.
+  String? findBySuffix(String scannedCode) {
+    if (scannedCode.isEmpty) return null;
+    
+    // Primeiro, verifica match exato
+    if (containsBarcode(scannedCode)) {
+      return scannedCode;
+    }
+    
+    // Busca códigos cadastrados que sejam sufixo do escaneado
+    // Prioriza o match mais longo (mais específico)
+    String? bestMatch;
+    int bestLength = 0;
+    
+    for (final item in _barcodes) {
+      final cadastrado = item.code;
+      // Verifica se o escaneado termina com o cadastrado
+      if (scannedCode.endsWith(cadastrado) && cadastrado.length > bestLength) {
+        bestMatch = cadastrado;
+        bestLength = cadastrado.length;
+      }
+    }
+    
+    return bestMatch;
+  }
+
+  /// Verifica se um código escaneado corresponde a algum cadastrado.
+  /// Considera match exato ou por sufixo.
+  bool containsBarcodeOrSuffix(String scannedCode) {
+    return findBySuffix(scannedCode) != null;
+  }
+
   /// Adiciona um novo código à lista.
   /// Retorna true se adicionado com sucesso, false se já existir ou for vazio.
-  /// Notifica listeners, persiste localmente e sincroniza com Firebase.
+  /// Notifica listeners, persiste localmente e sincroniza com a API.
+  /// Use [addBarcodeItemForBatch] para importações em lote (sem sync individual).
   bool addBarcodeItem(BarcodeItem item) {
     if (item.code.isEmpty) return false;
     if (containsBarcode(item.code)) return false;  // Evita duplicatas
@@ -145,7 +180,7 @@ class BarcodeManager extends ChangeNotifier {
     notifyListeners();  // Atualiza UI
     Future.microtask(() => _saveToStorage());  // Salva localmente
 
-    // Sincroniza com Firestore
+    // Sincroniza com a API
     if (_syncService != null) {
       Future.microtask(() => _syncService.syncItem(item));
     }
@@ -153,8 +188,22 @@ class BarcodeManager extends ChangeNotifier {
     return true;
   }
 
-  /// Versão silenciosa para adicionar código (usada quando dados vêm do Firebase).
-  /// Atualiza item existente ou adiciona novo, mas NÃO sincroniza de volta para Firebase.
+  /// Adiciona item para importação em lote.
+  /// NÃO sincroniza individualmente - use mergeDetails depois para sync batch.
+  bool addBarcodeItemForBatch(BarcodeItem item) {
+    if (item.code.isEmpty) return false;
+    if (containsBarcode(item.code)) return false;  // Evita duplicatas
+    
+    _barcodes.add(item);
+    notifyListeners();  // Atualiza UI
+    Future.microtask(() => _saveToStorage());  // Salva localmente
+    // NÃO sincroniza aqui - será feito em batch via mergeDetails
+
+    return true;
+  }
+
+  /// Versão silenciosa para adicionar código (usada quando dados vêm da API).
+  /// Atualiza item existente ou adiciona novo, mas NÃO sincroniza de volta para API.
   void addBarcodeItemSilent(BarcodeItem item) {
     if (item.code.isEmpty) return;
     final index = _barcodes.indexWhere((i) => i.code == item.code);

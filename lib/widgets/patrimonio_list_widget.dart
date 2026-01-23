@@ -9,6 +9,7 @@ class BarcodeListWidget extends StatelessWidget {
   final Function(String, BarcodeStatus) onStatusChange;
   final void Function(BarcodeItem)? onTapItem;
   final String? Function(String code)? getPhotoPath;
+  final String? Function(String code)? getDepartamento;  // Novo callback
 
   const BarcodeListWidget({
     super.key,
@@ -17,6 +18,7 @@ class BarcodeListWidget extends StatelessWidget {
     required this.onStatusChange,
     this.onTapItem,
     this.getPhotoPath,
+    this.getDepartamento,
   });
 
   void _showStatusDialog(BuildContext context, BarcodeItem item) {
@@ -27,6 +29,10 @@ class BarcodeListWidget extends StatelessWidget {
       ),
       builder: (context) => Container(
         padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -36,7 +42,7 @@ class BarcodeListWidget extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: AppColors.textLight,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -186,14 +192,14 @@ class BarcodeListWidget extends StatelessWidget {
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
             return Container(
-              color: Colors.grey[200],
-              child: const Icon(Icons.broken_image, color: Colors.grey),
+              color: AppColors.surfaceVariant,
+              child: Icon(Icons.broken_image, color: AppColors.textLight),
             );
           },
           loadingBuilder: (context, child, loadingProgress) {
             if (loadingProgress == null) return child;
             return Container(
-              color: Colors.grey[100],
+              color: AppColors.surfaceVariant,
               child: const Center(
                 child: SizedBox(
                   width: 20,
@@ -219,11 +225,11 @@ class BarcodeListWidget extends StatelessWidget {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withOpacity(0.2),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -254,6 +260,36 @@ class BarcodeListWidget extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 4),
+                          // Mostra o departamento se disponível
+                          if (getDepartamento != null)
+                            Builder(builder: (context) {
+                              final deptName = getDepartamento!(item.code);
+                              if (deptName != null && deptName.isNotEmpty) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.meeting_room, 
+                                        size: 12, 
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          deptName,
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 11,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            }),
                           if (item.status != BarcodeStatus.none)
                             Container(
                               padding: const EdgeInsets.symmetric(

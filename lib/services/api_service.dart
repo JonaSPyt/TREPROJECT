@@ -19,6 +19,21 @@ class ApiService {
     print('🔧 API_BASE_URL do .env: ${dotenv.env['API_BASE_URL']}');
   }
 
+  /// Converte valor monetário brasileiro (1.234,56) para formato numérico (1234.56)
+  String? _convertBrazilianCurrency(String? value) {
+    if (value == null || value.isEmpty) return null;
+    // Remove espaços
+    String cleaned = value.trim();
+    // Remove R$ se existir
+    cleaned = cleaned.replaceAll('R\$', '').trim();
+    // Remove pontos de milhar e troca vírgula por ponto
+    // Ex: "1.234,56" -> "1234.56"
+    cleaned = cleaned.replaceAll('.', '').replaceAll(',', '.');
+    // Verifica se é um número válido
+    final parsed = double.tryParse(cleaned);
+    return parsed != null ? cleaned : null;
+  }
+
   /// Cabeçalhos padrão para requisições JSON
   Map<String, String> get _headers => {
     'Content-Type': 'application/json; charset=UTF-8',
@@ -152,7 +167,7 @@ class ApiService {
         'descricao': details?.descricao ?? 'Patrimônio ${item.code}',  // Campo obrigatório
         'localizacao': details?.localizacao,
         'oldcode': details?.oldCode,
-        'valor': details?.valorAquisicao,
+        'valor': _convertBrazilianCurrency(details?.valorAquisicao),
         'status': item.status.index,
       });
       
@@ -216,7 +231,7 @@ class ApiService {
         'descricao': details?.descricao ?? 'Patrimônio ${item.code}',
         'localizacao': details?.localizacao,
         'oldcode': details?.oldCode,
-        'valor': details?.valorAquisicao,
+        'valor': _convertBrazilianCurrency(details?.valorAquisicao),
         'status': item.status.index,
       });
       
@@ -319,13 +334,19 @@ class ApiService {
           continue;
         }
         
+        // Busca o status do BarcodeItem correspondente
+        final barcodeItem = barcodeManager.barcodes.firstWhere(
+          (b) => b.code == detail.code,
+          orElse: () => BarcodeItem(code: detail.code!, status: BarcodeStatus.none),
+        );
+        
         // Monta objeto removendo campos null explicitamente
         final Map<String, dynamic> tombamento = {
           'codigo': detail.code,
           'descricao': detail.descricao?.isNotEmpty == true 
               ? detail.descricao 
               : 'Patrimônio ${detail.code}',
-          'status': 1, // Status padrão: encontrado
+          'status': barcodeItem.status.index, // Usa status do BarcodeItem
         };
         
         // Adiciona campos opcionais apenas se não forem vazios
@@ -336,8 +357,11 @@ class ApiService {
           tombamento['oldcode'] = detail.oldCode;
         }
         if (detail.valorAquisicao != null && detail.valorAquisicao!.isNotEmpty) {
-          // Converte vírgula para ponto (formato brasileiro -> inglês)
-          tombamento['valor'] = detail.valorAquisicao!.replaceAll(',', '.');
+          // Converte valor monetário brasileiro para formato numérico
+          final valorConvertido = _convertBrazilianCurrency(detail.valorAquisicao);
+          if (valorConvertido != null) {
+            tombamento['valor'] = valorConvertido;
+          }
         }
         
         tombamentos.add(tombamento);
@@ -704,18 +728,19 @@ class ApiService {
         if (response.statusCode == 200 || response.statusCode == 204) {
           print('✅ Dados limpos com sucesso via /tombamentos/all!');
           return;
-        } else if (response.statusCode != 404) {
-          print('❌ Erro ao limpar dados: ${response.statusCode}');
-          return;
+        } else if (response.statusCode == 404) {
+          // Endpoint não existe, vai deletar individualmente
+          print('⚠️  Endpoint /tombamentos/all não existe, deletando individualmente...');
+        } else {
+          // Erro 500 ou outro - tenta deletar individualmente como fallback
+          print('⚠️  Erro ${response.statusCode} no endpoint batch, tentando individualmente...');
         }
-        // Se 404, continua para deletar individualmente
-        print('⚠️  Endpoint /tombamentos/all não existe, deletando individualmente...');
       } catch (e) {
         print('⚠️  Erro no endpoint batch: $e');
         print('   Tentando deletar individualmente...');
       }
       
-      // Se o endpoint batch não existe, busca todos e deleta um por um
+      // Se o endpoint batch não existe ou falhou, busca todos e deleta um por um
       print('📋 Buscando todos os tombamentos...');
       final getResponse = await http.get(
         Uri.parse('$baseUrl/tombamentos'),

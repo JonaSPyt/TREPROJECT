@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'pages/barcode_scanner_screen.dart';
-import 'pages/patrimonio_list_screen.dart';
+import 'pages/departamentos_screen.dart';
+import 'pages/tombamentos_sem_departamento_screen.dart';
 import 'utils/patrimonio_manager.dart';
 import 'services/api_service.dart';
-import 'package:file_picker/file_picker.dart';
-import 'services/csv_import_service.dart';
-import 'services/pdf_import_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_colors.dart';
 
@@ -139,164 +137,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final connected = await widget.apiService.checkConnection();
     if (mounted) {
       setState(() => _isConnected = connected);
-    }
-  }
-
-  Future<void> _importFile() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv', 'pdf'],
-        withData: true,
-      );
-
-      if (result == null || result.files.isEmpty) return;
-
-      final file = result.files.single;
-      final bytes = file.bytes;
-
-      if (bytes == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.white),
-                  SizedBox(width: 12),
-                  Text('Erro ao ler arquivo.'),
-                ],
-              ),
-              backgroundColor: AppColors.error,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          );
-        }
-        return;
-      }
-
-      // Mostra loading
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text('Importando arquivo...'),
-              ],
-            ),
-            backgroundColor: AppColors.primary,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 30),
-          ),
-        );
-      }
-
-      // Detecta tipo do arquivo e parseia apropriadamente
-      final extension = file.extension?.toLowerCase();
-      late final dynamic parsed;
-      
-      if (extension == 'pdf') {
-        print('📄 Importando PDF...');
-        parsed = await PdfImportService.parsePdfWithDetails(bytes);
-      } else {
-        print('📊 Importando CSV...');
-        parsed = CsvImportService.parseCsvWithDetails(bytes);
-      }
-      
-      widget.barcodeManager.mergeDetails(parsed.detailsByCode);
-      final items = parsed.items;
-
-      if (!mounted) return;
-      
-      // Remove snackbar de loading
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
-      if (items.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.white),
-                const SizedBox(width: 12),
-                Text('${extension == 'pdf' ? 'PDF' : 'CSV'} não contém patrimônios válidos.'),
-              ],
-            ),
-            backgroundColor: AppColors.warning,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-        return;
-      }
-
-      int added = 0;
-      int skipped = 0;
-      for (final it in items) {
-        // Cria BarcodeItem com status padrão 'none' (Sem status)
-        final item = BarcodeItem(code: it, status: BarcodeStatus.none);
-        final wasAdded = widget.barcodeManager.addBarcodeItem(item);
-        if (wasAdded) {
-          added++;
-        } else {
-          skipped++;
-        }
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Text('Importado: $added novos, $skipped já existiam'),
-              ],
-            ),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => BlankScreen(
-              barcodeManager: widget.barcodeManager,
-              apiService: widget.apiService,
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Erro ao importar: $e')),
-              ],
-            ),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
     }
   }
 
@@ -485,46 +325,59 @@ class _HomeScreenState extends State<HomeScreen> {
                               apiService: widget.apiService,
                             ),
                           ),
-                        );
+                        ).then((_) => setState(() {}));
                       },
                     ),
                     
                     const SizedBox(height: 12),
                     
-                    // Card Lista
+                    // Card Departamentos (no lugar da lista)
                     _buildActionCard(
                       context,
-                      icon: Icons.list_alt_rounded,
-                      title: 'Lista de Patrimônios',
-                      subtitle: '$itemCount itens cadastrados',
+                      icon: Icons.meeting_room_rounded,
+                      title: 'Departamentos',
+                      subtitle: 'Organizar patrimônios por sala',
                       gradient: AppColors.secondaryGradient,
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => BlankScreen(
+                            builder: (context) => DepartamentosScreen(
                               barcodeManager: widget.barcodeManager,
-                              apiService: widget.apiService,
                             ),
                           ),
-                        );
+                        ).then((_) {
+                          if (mounted) {
+                            print('🔄 Voltando dos departamentos - atualizando tela principal (${widget.barcodeManager.barcodes.length} itens)');
+                            setState(() {});
+                          }
+                        });
                       },
                     ),
                     
                     const SizedBox(height: 12),
                     
-                    // Card Importar
+                    // Card Tombamentos sem Departamento
                     _buildActionCard(
                       context,
-                      icon: Icons.upload_file_rounded,
-                      title: 'Importar Arquivo',
-                      subtitle: 'CSV ou PDF com patrimônios',
+                      icon: Icons.folder_off_rounded,
+                      title: 'Sem Departamento',
+                      subtitle: 'Tombamentos não vinculados',
                       gradient: const LinearGradient(
-                        colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
+                        colors: [Color(0xFF64748B), Color(0xFF475569)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      onTap: _importFile,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TombamentosSemDepartamentoScreen(
+                              barcodeManager: widget.barcodeManager,
+                            ),
+                          ),
+                        ).then((_) => setState(() {}));
+                      },
                     ),
                     
                     const SizedBox(height: 32),

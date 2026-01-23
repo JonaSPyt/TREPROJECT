@@ -8,31 +8,57 @@ class CsvImportService {
   /// Resultado do parsing contendo itens e metadados por código.
   static CsvParseResult parseCsvWithDetails(Uint8List bytes) {
     final content = utf8.decode(bytes, allowMalformed: true);
-    final rows = const CsvToListConverter(fieldDelimiter: ',').convert(content);
-    if (rows.isEmpty)
+    // Detecta delimitador por linha (prioridade: ; > , > tab)
+    List<List<dynamic>> rows = [];
+    List<String> lines = content.split(RegExp(r'\r?\n'));
+    String? detectedDelimiter;
+    for (final line in lines) {
+      if (line.trim().isEmpty) continue;
+      String delimiter = ',';
+      if (line.contains(';') && line.split(';').length > line.split(',').length) {
+        delimiter = ';';
+      } else if (line.contains('\t')) {
+        delimiter = '\t';
+      }
+      detectedDelimiter ??= delimiter;
+      final parsed = const CsvToListConverter().convert(line, fieldDelimiter: delimiter);
+      if (parsed.isNotEmpty) rows.add(parsed.first);
+    }
+    if (rows.isEmpty) {
       return CsvParseResult(items: const [], detailsByCode: const {});
-
-    final header = rows.first.map((e) => e.toString().trim()).toList();
-
-    int idxOf(String nameFallback, int fallbackIndex) {
-      final i = header.indexWhere(
-        (h) => h.toLowerCase() == nameFallback.toLowerCase(),
-      );
-      return i == -1 ? fallbackIndex : i;
     }
 
-    final patrimonioIndex = (() {
-      final i = header.indexWhere((h) {
-        final l = h.toLowerCase();
-        return l == 'patrimônio' || l == 'patrimonio';
-      });
-      return i == -1 ? 6 : i;
-    })();
-    final itemIndex = idxOf('Item', 5);
-    final oldIndex = idxOf('P. Antigo', 7);
-    final descIndex = idxOf('Descrição', 8);
-    final locIndex = idxOf('Localização', 9);
-    final valIndex = idxOf('VI. Aquisição (R\$)', 10);
+    // Remove linhas totalmente em branco
+    final filteredRows = rows.where((row) => row.any((cell) => cell != null && cell.toString().trim().isNotEmpty)).toList();
+    if (filteredRows.isEmpty) {
+      return CsvParseResult(items: const [], detailsByCode: const {});
+    }
+
+    // Aceita cabeçalhos variados
+    final header = filteredRows.first.map((e) => e.toString().trim().toLowerCase()).toList();
+
+    int idxOf(List<String> names, int fallbackIndex) {
+      for (final n in names) {
+        final i = header.indexWhere((h) => h == n.toLowerCase());
+        if (i != -1) return i;
+      }
+      return fallbackIndex;
+    }
+
+    final patrimonioIndex = idxOf(['patrimônio','patrimonio','codigo','código','code'], 0);
+    final itemIndex = idxOf(['item','nome','name'], 1);
+    final oldIndex = idxOf(['p. antigo','antigo','old'], 2);
+    final descIndex = idxOf(['descrição','descricao','description'], 3);
+    final locIndex = idxOf(['localização','localizacao','location'], 4);
+    final valIndex = idxOf([
+      'vi. aquisição (r\$)',
+      'vi. aquisicao (r\$)',
+      'valor',
+      'value',
+      'preço',
+      'preco',
+      'price'
+    ], 5);
 
     bool parseBool(dynamic v) {
       if (v == null) return false;
@@ -56,21 +82,34 @@ class CsvImportService {
 
     final List<BarcodeItem> items = [];
     final Map<String, AssetDetails> details = {};
+    int linhasPuladas = 0;
 
-    for (int i = 1; i < rows.length; i++) {
-      final row = rows[i];
-      if (row.length <= patrimonioIndex) continue;
+    for (int i = 1; i < filteredRows.length; i++) {
+      final row = filteredRows[i];
+      if (row.length <= patrimonioIndex) {
+        linhasPuladas++;
+        print('⚠️ Linha $i pulada: row.length (${row.length}) <= patrimonioIndex ($patrimonioIndex)');
+        continue;
+      }
       final value = row[patrimonioIndex];
-      if (value == null) continue;
+      if (value == null) {
+        linhasPuladas++;
+        print('⚠️ Linha $i pulada: valor nulo na coluna patrimônio');
+        continue;
+      }
       final code = value.toString().trim();
-      if (code.isEmpty) continue;
+      if (code.isEmpty) {
+        linhasPuladas++;
+        print('⚠️ Linha $i pulada: código vazio');
+        continue;
+      }
       final status = statusFromFlags(row);
       items.add(BarcodeItem(code: code, status: status));
 
-      String? safeAt(int idx) =>
+      String safeAt(int idx) =>
           (idx >= 0 && idx < row.length && row[idx] != null)
           ? row[idx].toString().trim()
-          : null;
+          : '';
 
       details[code] = AssetDetails(
         code: code,
@@ -82,6 +121,7 @@ class CsvImportService {
       );
     }
 
+    print('📊 CSV Parser: ${filteredRows.length - 1} linhas de dados, $linhasPuladas puladas, ${items.length} itens válidos');
     return CsvParseResult(items: items, detailsByCode: details);
   }
 
