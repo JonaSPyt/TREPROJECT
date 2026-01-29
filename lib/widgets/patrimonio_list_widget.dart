@@ -360,9 +360,9 @@ class BarcodeListWidget extends StatelessWidget {
             child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
-            onPressed: () {
-              onDelete(item.code);
-              Navigator.pop(context);
+            onPressed: () async {
+              Navigator.pop(context); // Fecha o dialog primeiro
+              await onDelete(item.code); // Aguarda a remoção (agora é async)
             },
             child: const Text('Remover', style: TextStyle(color: AppColors.error)),
           ),

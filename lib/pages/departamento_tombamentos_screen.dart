@@ -272,7 +272,7 @@ class _DepartamentoTombamentosScreenState extends State<DepartamentoTombamentosS
         final codigo = tombamento['codigo'] as String?;
         if (codigo != null && widget.barcodeManager != null) {
           await widget.barcodeManager!.removePhotoForCode(codigo); // Remove foto local
-          widget.barcodeManager!.removeBarcode(codigo);
+          await widget.barcodeManager!.removeBarcode(codigo); // Agora é async
         }
         
         _showSnackBar('Tombamento removido!', Colors.green);
@@ -581,7 +581,7 @@ class _DepartamentoTombamentosScreenState extends State<DepartamentoTombamentosS
       final codigos = _tombamentos.map((t) => t['codigo']?.toString()).whereType<String>().toList();
       print('🗑️ Preparando exclusão de ${codigos.length} tombamentos...');
       print('🗑️ BarcodeManager disponível: ${widget.barcodeManager != null}');
-      print('🗑️ Total no BarcodeManager antes: ${widget.barcodeManager?.barcodes.length ?? 0}');
+      widget.barcodeManager?.debugPrintStatus();
 
       // Usa o endpoint batch para excluir todos de uma vez
       final result = await _service.excluirTodosTombamentos(widget.departamento.id!);
@@ -592,10 +592,12 @@ class _DepartamentoTombamentosScreenState extends State<DepartamentoTombamentosS
       if (widget.barcodeManager != null) {
         for (final codigo in codigos) {
           await widget.barcodeManager!.removePhotoForCode(codigo);
-          widget.barcodeManager!.removeBarcodeSilent(codigo); // Remove do BarcodeManager local
+          await widget.barcodeManager!.removeBarcodeSilent(codigo); // Agora é async - aguarda persistência
         }
+        // Força persistência final para garantir que tudo foi salvo
+        await widget.barcodeManager!.forcePersist();
         print('🗑️ ${codigos.length} tombamentos removidos localmente');
-        print('🗑️ Total no BarcodeManager depois: ${widget.barcodeManager!.barcodes.length}');
+        widget.barcodeManager!.debugPrintStatus();
       } else {
         print('⚠️ BarcodeManager é null - não foi possível limpar dados locais!');
       }

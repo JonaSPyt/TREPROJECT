@@ -119,7 +119,7 @@ class ApiService {
         final codigosLocais = barcodeManager.barcodes.map((e) => e.code).toList();
         for (final codigoLocal in codigosLocais) {
           if (!codigosNaApi.contains(codigoLocal)) {
-            barcodeManager.removeBarcodeSilent(codigoLocal);
+            await barcodeManager.removeBarcodeSilent(codigoLocal);
             print('  🗑️  Removido localmente (não existe na API): $codigoLocal');
           }
         }

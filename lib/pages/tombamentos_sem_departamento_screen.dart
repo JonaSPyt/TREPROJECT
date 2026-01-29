@@ -168,10 +168,11 @@ class _TombamentosSemDepartamentoScreenState extends State<TombamentosSemDeparta
       try {
         await _service.excluirTombamentoSemDepartamento(tombamento['id']);
         
-        // Remove foto local se disponível
+        // Remove foto local e código do BarcodeManager se disponível
         final codigo = tombamento['codigo']?.toString();
         if (codigo != null && widget.barcodeManager != null) {
           await widget.barcodeManager!.removePhotoForCode(codigo);
+          await widget.barcodeManager!.removeBarcodeSilent(codigo); // Também remove do cache local
         }
         
         await _loadData();

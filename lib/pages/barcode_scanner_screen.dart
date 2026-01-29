@@ -403,10 +403,32 @@ class _ScannerScreenState extends State<ScannerScreen> {
     debugPrint('🔍 [Scanner] Código escaneado: $raw');
     debugPrint('🔍 [Scanner] Match local: $matchedCode');
     
-    // 2. Se não encontrou localmente, busca no backend por sufixo
+    // 2. Se encontrou localmente, verifica se ainda existe no backend (evita dados fantasmas)
+    //    Se não encontrou localmente, busca no backend por sufixo
+    final deptService = DepartamentoService();
+    
+    if (matchedCode != null) {
+      // Valida se o código local ainda existe no backend
+      try {
+        final result = await deptService.buscarTombamentoPorCodigoOuSufixo(matchedCode);
+        if (result == null) {
+          // Código existe localmente mas não no backend - é um dado fantasma!
+          debugPrint('⚠️ [Scanner] Código $matchedCode não existe mais no backend - removendo do cache local');
+          await widget.barcodeManager.removeBarcodeSilent(matchedCode);
+          await widget.barcodeManager.removePhotoForCode(matchedCode);
+          matchedCode = null; // Trata como código novo
+        } else {
+          tombamentoBackend = result['tombamento'] as Map<String, dynamic>?;
+          debugPrint('✅ [Scanner] Código $matchedCode validado no backend');
+        }
+      } catch (e) {
+        // Se falhar a verificação, assume que está ok (pode ser problema de rede)
+        debugPrint('⚠️ [Scanner] Erro ao validar código no backend: $e - mantendo local');
+      }
+    }
+    
     if (matchedCode == null) {
       try {
-        final deptService = DepartamentoService();
         final result = await deptService.buscarTombamentoPorCodigoOuSufixo(raw);
         debugPrint('🔍 [Scanner] Resultado backend: $result');
         if (result != null) {
@@ -439,8 +461,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
       if (matchedCode == null) {
         // Verifica se há departamento vinculado a este código (pode retornar null)
         try {
-          final deptSvc = DepartamentoService();
-          final dept = await deptSvc.buscarDepartamentoPorTombamento(raw);
+          final dept = await deptService.buscarDepartamentoPorTombamento(raw);
           if (dept == null && mounted) {
             // Mostra um dialog informativo explicito
             final escolha = await showDialog<String?>(

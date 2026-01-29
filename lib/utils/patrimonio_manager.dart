@@ -72,11 +72,42 @@ class BarcodeManager extends ChangeNotifier {
   /// Retorna lista imutável de códigos para leitura externa
   List<BarcodeItem> get barcodes => List.unmodifiable(_barcodes);
   
+  /// Retorna o total de códigos armazenados
+  int get totalCodigos => _barcodes.length;
+  
+  /// Retorna o total de detalhes armazenados
+  int get totalDetalhes => _detailsByCode.length;
+  
+  /// Retorna o total de fotos armazenadas
+  int get totalFotos => _photoByCode.length;
+  
   /// Obtém detalhes de um código específico (pode ser null se não existir)
   AssetDetails? getDetails(String code) => _detailsByCode[code];
   
   /// Obtém caminho da foto de um código específico (pode ser null)
   String? getPhotoPath(String code) => _photoByCode[code];
+
+  /// Força a persistência de todos os dados imediatamente.
+  /// Útil para garantir que mudanças sejam salvas antes de operações críticas.
+  Future<void> forcePersist() async {
+    print('💾 Forçando persistência de todos os dados...');
+    await _saveToStorage();
+    await _saveDetailsToStorage();
+    await _savePhotosToStorage();
+    print('✅ Dados persistidos: $_barcodes códigos, ${_detailsByCode.length} detalhes, ${_photoByCode.length} fotos');
+  }
+
+  /// Exibe um resumo do estado atual do cache para debug.
+  void debugPrintStatus() {
+    print('📊 === BarcodeManager Status ===');
+    print('   Códigos: ${_barcodes.length}');
+    print('   Detalhes: ${_detailsByCode.length}');
+    print('   Fotos: ${_photoByCode.length}');
+    if (_barcodes.isNotEmpty) {
+      print('   Primeiros 5 códigos: ${_barcodes.take(5).map((e) => e.code).toList()}');
+    }
+    print('================================');
+  }
 
   /// Vincula uma foto a um código específico.
   /// Salva no mapa interno, notifica listeners e persiste no storage.
@@ -233,12 +264,14 @@ class BarcodeManager extends ChangeNotifier {
   /// Remove um código da lista.
   /// Remove tanto o código quanto seus detalhes associados.
   /// Notifica listeners, persiste e sincroniza remoção com a API.
-  void removeBarcode(String barcode) {
+  /// IMPORTANTE: Agora é async e aguarda a persistência para evitar dados fantasmas.
+  Future<void> removeBarcode(String barcode) async {
     _barcodes.removeWhere((item) => item.code == barcode);
     _detailsByCode.remove(barcode);
     notifyListeners();
-    Future.microtask(() => _saveToStorage());
-    Future.microtask(() => _saveDetailsToStorage());
+    // Aguarda a persistência para garantir que os dados sejam salvos
+    await _saveToStorage();
+    await _saveDetailsToStorage();
 
     // Sincroniza remoção com a API
     if (_syncService != null) {
@@ -248,22 +281,28 @@ class BarcodeManager extends ChangeNotifier {
 
   /// Versão silenciosa para remoção (usada quando remoção vem do Firebase).
   /// NÃO sincroniza de volta para evitar loops.
-  void removeBarcodeSilent(String barcode) {
+  /// IMPORTANTE: Agora é async e aguarda a persistência para evitar dados fantasmas.
+  Future<void> removeBarcodeSilent(String barcode) async {
     _barcodes.removeWhere((item) => item.code == barcode);
     _detailsByCode.remove(barcode);
     notifyListeners();
-    Future.microtask(() => _saveToStorage());
-    Future.microtask(() => _saveDetailsToStorage());
+    // Aguarda a persistência para garantir que os dados sejam salvos
+    await _saveToStorage();
+    await _saveDetailsToStorage();
   }
 
   /// Limpa todos os dados (códigos e detalhes).
   /// Notifica listeners, persiste e sincroniza com Firebase.
-  void clearAll() {
+  /// IMPORTANTE: Agora é async e aguarda a persistência para evitar dados fantasmas.
+  Future<void> clearAll() async {
     _barcodes.clear();
     _detailsByCode.clear();
+    _photoByCode.clear(); // Também limpa fotos
     notifyListeners();
-    Future.microtask(() => _saveToStorage());
-    Future.microtask(() => _saveDetailsToStorage());
+    // Aguarda a persistência para garantir que os dados sejam salvos
+    await _saveToStorage();
+    await _saveDetailsToStorage();
+    await _savePhotosToStorage();
 
     // Sincroniza limpeza com Firestore
     if (_syncService != null) {

@@ -251,8 +251,8 @@ class _BlankScreenState extends State<BlankScreen> {
                         child: const Text('Cancelar'),
                       ),
                       TextButton(
-                        onPressed: () {
-                          widget.barcodeManager.clearAll();
+                        onPressed: () async {
+                          await widget.barcodeManager.clearAll(); // Agora é async
                           Navigator.pop(context);
                         },
                         child: const Text('Limpar'),
@@ -332,8 +332,8 @@ class _BlankScreenState extends State<BlankScreen> {
               onRefresh: _refreshData,
               child: BarcodeListWidget(
                 barcodes: barcodes,
-                onDelete: (barcode) {
-                  widget.barcodeManager.removeBarcode(barcode);
+                onDelete: (barcode) async {
+                  await widget.barcodeManager.removeBarcode(barcode); // Agora é async
                 },
                 onStatusChange: (barcode, status) {
                   widget.barcodeManager.updateBarcodeStatus(barcode, status);
